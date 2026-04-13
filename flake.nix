@@ -21,7 +21,7 @@
     devShells = forEachSupportedSystem (
       {pkgs}: {
         default = pkgs.mkShellNoCC {
-          packages = with pkgs; [bun typescript-language-server tailwindcss-language-server biome];
+          packages = with pkgs; [bun typescript-language-server tailwindcss-language-server biome turbo];
         };
       }
     );
