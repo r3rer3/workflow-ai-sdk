@@ -29,6 +29,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
     "ai": "^6.0.152",
     "nanoid": "^5.1.6",
     "zod": "^4.1.12"
