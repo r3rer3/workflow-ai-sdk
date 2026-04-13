@@ -1,0 +1,16 @@
+node_modules
+.turbo
+dist
+coverage
+.next
+out
+*.tsbuildinfo
+.DS_Store
+.direnv
+.envrc
+.env.local
+.env.*.local
+apps/docs/.source
+apps/docs/next-env.d.ts
+apps/examples/.next
+.claude/
