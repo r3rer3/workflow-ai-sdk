@@ -122,3 +122,75 @@ export function workflowEvent<TType extends string, TData = undefined>(
     },
   };
 }
+
+export class WorkflowEventValidationError extends Error {
+  readonly eventType: string;
+  readonly issues: readonly StandardSchemaV1.Issue[];
+
+  constructor(eventType: string, issues: readonly StandardSchemaV1.Issue[]) {
+    super(
+      `Workflow event ${JSON.stringify(eventType)} failed validation: ${formatValidationIssues(issues)}`,
+    );
+    this.name = "WorkflowEventValidationError";
+    this.eventType = eventType;
+    this.issues = issues;
+  }
+}
+
+export async function validateWorkflowEvent<TType extends string, TData>(
+  definition: WorkflowEventDefinition<TType, TData>,
+  event: WorkflowDispatchedEvent<string, unknown>,
+): Promise<WorkflowDispatchedEvent<TType, TData>> {
+  if (event.type !== definition.type) {
+    throw new Error(
+      `Cannot validate workflow event ${JSON.stringify(event.type)} against ${JSON.stringify(definition.type)}.`,
+    );
+  }
+
+  if (!definition.schema) {
+    return decorateWorkflowEvent({
+      type: definition.type,
+      data: event.data as TData,
+    });
+  }
+
+  const result = await definition.schema["~standard"].validate(event.data);
+
+  if (result.issues) {
+    throw new WorkflowEventValidationError(definition.type, result.issues);
+  }
+
+  return decorateWorkflowEvent({
+    type: definition.type,
+    data: result.value,
+  });
+}
+
+function formatIssuePath(path: StandardSchemaV1.Issue["path"]): string | null {
+  if (!path || path.length === 0) {
+    return null;
+  }
+
+  const rendered = path
+    .map((segment) => {
+      if (typeof segment === "object" && segment !== null && "key" in segment) {
+        return String(segment.key);
+      }
+
+      return String(segment);
+    })
+    .join(".");
+
+  return rendered.length > 0 ? rendered : null;
+}
+
+function formatValidationIssues(
+  issues: readonly StandardSchemaV1.Issue[],
+): string {
+  return issues
+    .map((issue) => {
+      const path = formatIssuePath(issue.path);
+      return path ? `${path}: ${issue.message}` : issue.message;
+    })
+    .join("; ");
+}
