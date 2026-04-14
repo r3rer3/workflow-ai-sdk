@@ -1,4 +1,7 @@
 import type {
+  AgentEndEventData,
+  AgentStartEventData,
+  AgentUsageEntry,
   ExecutionHierarchy,
   ToolEndEventData,
   ToolStartEventData,
@@ -14,6 +17,18 @@ export function createWorkflowHierarchy(
   };
 }
 
+export function extendHierarchyWithAgent(
+  hierarchy: ExecutionHierarchy,
+  agentName: string,
+  agentRunId: string,
+): ExecutionHierarchy {
+  return {
+    ...hierarchy,
+    agentName,
+    agentRunId,
+  };
+}
+
 export function extendHierarchyWithTool(
   hierarchy: ExecutionHierarchy,
   toolName: string,
@@ -23,6 +38,37 @@ export function extendHierarchyWithTool(
     ...hierarchy,
     toolName,
     toolCallId,
+  };
+}
+
+export function createAgentStartEvent(args: {
+  agentName: string;
+  agentRunId: string;
+  hierarchy: ExecutionHierarchy;
+}): {
+  type: "agent-start";
+  data: AgentStartEventData;
+} {
+  return {
+    type: "agent-start",
+    data: args,
+  };
+}
+
+export function createAgentEndEvent(args: {
+  agentName: string;
+  agentRunId: string;
+  success: boolean;
+  durationMs: number;
+  hierarchy: ExecutionHierarchy;
+  usage?: AgentUsageEntry;
+}): {
+  type: "agent-end";
+  data: AgentEndEventData;
+} {
+  return {
+    type: "agent-end",
+    data: args,
   };
 }
 
