@@ -1,21 +1,21 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  createAgentEndPayload,
-  createAgentStartPayload,
-  createCustomPayload,
-  createToolEndPayload,
-  createToolStartPayload,
-  createWorkflowAbortedPayload,
-  createWorkflowEndPayload,
-  createWorkflowErrorPayload,
+  createAgentEndStreamEvent,
+  createAgentStartStreamEvent,
+  createCustomStreamEvent,
+  createToolEndStreamEvent,
+  createToolStartStreamEvent,
+  createWorkflowAbortedStreamEvent,
+  createWorkflowEndStreamEvent,
+  createWorkflowErrorStreamEvent,
   createWorkflowHierarchy,
-  createWorkflowPausedPayload,
-  createWorkflowStartPayload,
-  createWorkflowStepPayload,
+  createWorkflowPausedStreamEvent,
+  createWorkflowStartStreamEvent,
+  createWorkflowStepStreamEvent,
   extendHierarchyWithAgent,
   extendHierarchyWithTool,
-} from "./payload";
+} from "./create-stream-event";
 
 const hierarchy = createWorkflowHierarchy("test-workflow", "run_1");
 
@@ -64,9 +64,9 @@ describe("extendHierarchyWithTool", () => {
   });
 });
 
-describe("createWorkflowStartPayload", () => {
+describe("createWorkflowStartStreamEvent", () => {
   it("returns { type: 'workflow-start', data } with correct type string", () => {
-    const event = createWorkflowStartPayload({
+    const event = createWorkflowStartStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       threadId: "thread_1",
@@ -86,9 +86,9 @@ describe("createWorkflowStartPayload", () => {
   });
 });
 
-describe("createWorkflowStepPayload", () => {
+describe("createWorkflowStepStreamEvent", () => {
   it("returns { type: 'workflow-step', data } with correct type string", () => {
-    const event = createWorkflowStepPayload({
+    const event = createWorkflowStepStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       stepName: "step-1",
@@ -104,9 +104,9 @@ describe("createWorkflowStepPayload", () => {
   });
 });
 
-describe("createWorkflowEndPayload", () => {
+describe("createWorkflowEndStreamEvent", () => {
   it("returns { type: 'workflow-end', data } with correct type string", () => {
-    const event = createWorkflowEndPayload({
+    const event = createWorkflowEndStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       durationMs: 1500,
@@ -118,7 +118,7 @@ describe("createWorkflowEndPayload", () => {
   });
 
   it("includes result when provided", () => {
-    const event = createWorkflowEndPayload({
+    const event = createWorkflowEndStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       durationMs: 1000,
@@ -129,7 +129,7 @@ describe("createWorkflowEndPayload", () => {
   });
 
   it("omits result when not provided", () => {
-    const event = createWorkflowEndPayload({
+    const event = createWorkflowEndStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       durationMs: 500,
@@ -139,9 +139,9 @@ describe("createWorkflowEndPayload", () => {
   });
 });
 
-describe("createWorkflowErrorPayload", () => {
+describe("createWorkflowErrorStreamEvent", () => {
   it("returns { type: 'workflow-error', data } with correct type string", () => {
-    const event = createWorkflowErrorPayload({
+    const event = createWorkflowErrorStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       message: "something broke",
@@ -153,7 +153,7 @@ describe("createWorkflowErrorPayload", () => {
   });
 
   it("defaults retryable to true", () => {
-    const event = createWorkflowErrorPayload({
+    const event = createWorkflowErrorStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       message: "transient failure",
@@ -163,7 +163,7 @@ describe("createWorkflowErrorPayload", () => {
   });
 
   it("respects explicit retryable: false", () => {
-    const event = createWorkflowErrorPayload({
+    const event = createWorkflowErrorStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       message: "permanent failure",
@@ -174,9 +174,9 @@ describe("createWorkflowErrorPayload", () => {
   });
 });
 
-describe("createWorkflowPausedPayload", () => {
+describe("createWorkflowPausedStreamEvent", () => {
   it("returns { type: 'workflow-paused', data } with correct type string", () => {
-    const event = createWorkflowPausedPayload({
+    const event = createWorkflowPausedStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       reason: "waiting for approval",
@@ -188,7 +188,7 @@ describe("createWorkflowPausedPayload", () => {
   });
 
   it("includes payload when provided", () => {
-    const event = createWorkflowPausedPayload({
+    const event = createWorkflowPausedStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       reason: "needs input",
@@ -199,7 +199,7 @@ describe("createWorkflowPausedPayload", () => {
   });
 
   it("omits payload when not provided", () => {
-    const event = createWorkflowPausedPayload({
+    const event = createWorkflowPausedStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       reason: "paused",
@@ -209,9 +209,9 @@ describe("createWorkflowPausedPayload", () => {
   });
 });
 
-describe("createWorkflowAbortedPayload", () => {
+describe("createWorkflowAbortedStreamEvent", () => {
   it("returns { type: 'workflow-aborted', data } with correct type string", () => {
-    const event = createWorkflowAbortedPayload({
+    const event = createWorkflowAbortedStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       hierarchy,
@@ -222,7 +222,7 @@ describe("createWorkflowAbortedPayload", () => {
   });
 
   it("includes reason when provided", () => {
-    const event = createWorkflowAbortedPayload({
+    const event = createWorkflowAbortedStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       reason: "user cancelled",
@@ -232,7 +232,7 @@ describe("createWorkflowAbortedPayload", () => {
   });
 
   it("omits reason when not provided", () => {
-    const event = createWorkflowAbortedPayload({
+    const event = createWorkflowAbortedStreamEvent({
       workflowName: "test-workflow",
       runId: "run_1",
       hierarchy,
@@ -241,9 +241,9 @@ describe("createWorkflowAbortedPayload", () => {
   });
 });
 
-describe("createCustomPayload", () => {
+describe("createCustomStreamEvent", () => {
   it("returns { type: 'custom-event', data } with correct type string", () => {
-    const event = createCustomPayload({
+    const event = createCustomStreamEvent({
       name: "my-custom",
       data: { key: "value" },
       hierarchy,
@@ -255,9 +255,9 @@ describe("createCustomPayload", () => {
   });
 });
 
-describe("createAgentStartPayload", () => {
+describe("createAgentStartStreamEvent", () => {
   it("returns { type: 'agent-start', data } with correct type string", () => {
-    const event = createAgentStartPayload({
+    const event = createAgentStartStreamEvent({
       agentName: "agent-1",
       agentRunId: "agent_run_1",
       hierarchy,
@@ -269,9 +269,9 @@ describe("createAgentStartPayload", () => {
   });
 });
 
-describe("createAgentEndPayload", () => {
+describe("createAgentEndStreamEvent", () => {
   it("returns { type: 'agent-end', data } with correct type string", () => {
-    const event = createAgentEndPayload({
+    const event = createAgentEndStreamEvent({
       agentName: "agent-1",
       agentRunId: "agent_run_1",
       success: true,
@@ -298,7 +298,7 @@ describe("createAgentEndPayload", () => {
       durationMs: 2000,
       success: true,
     };
-    const event = createAgentEndPayload({
+    const event = createAgentEndStreamEvent({
       agentName: "agent-1",
       agentRunId: "agent_run_1",
       success: true,
@@ -310,7 +310,7 @@ describe("createAgentEndPayload", () => {
   });
 
   it("omits usage when not provided", () => {
-    const event = createAgentEndPayload({
+    const event = createAgentEndStreamEvent({
       agentName: "agent-1",
       agentRunId: "agent_run_1",
       success: false,
@@ -321,9 +321,9 @@ describe("createAgentEndPayload", () => {
   });
 });
 
-describe("createToolStartPayload", () => {
+describe("createToolStartStreamEvent", () => {
   it("returns { type: 'tool-start', data } with correct type string", () => {
-    const event = createToolStartPayload({
+    const event = createToolStartStreamEvent({
       toolName: "tool-1",
       toolCallId: "call_1",
       hierarchy,
@@ -335,9 +335,9 @@ describe("createToolStartPayload", () => {
   });
 });
 
-describe("createToolEndPayload", () => {
+describe("createToolEndStreamEvent", () => {
   it("returns { type: 'tool-end', data } with correct type string", () => {
-    const event = createToolEndPayload({
+    const event = createToolEndStreamEvent({
       toolName: "tool-1",
       toolCallId: "call_1",
       success: true,

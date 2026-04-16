@@ -6,12 +6,13 @@ import type {
   WorkflowEndEventData,
   WorkflowExecutionMode,
   WorkflowPausedEventData,
+  WorkflowStreamEvent,
 } from "./types";
 
-type Payload<TType extends keyof WorkflowDataParts> = {
-  type: TType;
-  data: WorkflowDataParts[TType];
-};
+type StreamEvent<T extends keyof WorkflowDataParts> = Extract<
+  WorkflowStreamEvent,
+  { type: T }
+>;
 
 export function createWorkflowHierarchy(
   workflowName: string,
@@ -47,7 +48,7 @@ export function extendHierarchyWithTool(
   };
 }
 
-export function createWorkflowStartPayload(args: {
+export function createWorkflowStartStreamEvent(args: {
   workflowName: string;
   runId: string;
   threadId: string;
@@ -55,47 +56,47 @@ export function createWorkflowStartPayload(args: {
   mode: WorkflowExecutionMode;
   resumed: boolean;
   hierarchy: ExecutionHierarchy;
-}): Payload<"workflow-start"> {
+}): StreamEvent<"workflow-start"> {
   return {
     type: "workflow-start",
     data: args,
   };
 }
 
-export function createWorkflowStepPayload(args: {
+export function createWorkflowStepStreamEvent(args: {
   workflowName: string;
   runId: string;
   stepName: string;
   eventType: string;
   inputEventTypes: string[];
   hierarchy: ExecutionHierarchy;
-}): Payload<"workflow-step"> {
+}): StreamEvent<"workflow-step"> {
   return {
     type: "workflow-step",
     data: args,
   };
 }
 
-export function createWorkflowEndPayload(args: {
+export function createWorkflowEndStreamEvent(args: {
   workflowName: string;
   runId: string;
   durationMs: number;
   result?: WorkflowEndEventData["result"];
   hierarchy: ExecutionHierarchy;
-}): Payload<"workflow-end"> {
+}): StreamEvent<"workflow-end"> {
   return {
     type: "workflow-end",
     data: args,
   };
 }
 
-export function createWorkflowErrorPayload(args: {
+export function createWorkflowErrorStreamEvent(args: {
   workflowName: string;
   runId: string;
   message: string;
   retryable?: boolean;
   hierarchy: ExecutionHierarchy;
-}): Payload<"workflow-error"> {
+}): StreamEvent<"workflow-error"> {
   return {
     type: "workflow-error",
     data: {
@@ -105,85 +106,85 @@ export function createWorkflowErrorPayload(args: {
   };
 }
 
-export function createWorkflowPausedPayload(args: {
+export function createWorkflowPausedStreamEvent(args: {
   workflowName: string;
   runId: string;
   reason: string;
   payload?: WorkflowPausedEventData["payload"];
   hierarchy: ExecutionHierarchy;
-}): Payload<"workflow-paused"> {
+}): StreamEvent<"workflow-paused"> {
   return {
     type: "workflow-paused",
     data: args,
   };
 }
 
-export function createWorkflowAbortedPayload(args: {
+export function createWorkflowAbortedStreamEvent(args: {
   workflowName: string;
   runId: string;
   reason?: string;
   hierarchy: ExecutionHierarchy;
-}): Payload<"workflow-aborted"> {
+}): StreamEvent<"workflow-aborted"> {
   return {
     type: "workflow-aborted",
     data: args,
   };
 }
 
-export function createCustomPayload(args: {
+export function createCustomStreamEvent(args: {
   name: string;
   data: WorkflowCustomEventData["data"];
   hierarchy: ExecutionHierarchy;
-}): Payload<"custom-event"> {
+}): StreamEvent<"custom-event"> {
   return {
     type: "custom-event",
     data: args,
   };
 }
 
-export function createAgentStartPayload(args: {
+export function createAgentStartStreamEvent(args: {
   agentName: string;
   agentRunId: string;
   hierarchy: ExecutionHierarchy;
-}): Payload<"agent-start"> {
+}): StreamEvent<"agent-start"> {
   return {
     type: "agent-start",
     data: args,
   };
 }
 
-export function createAgentEndPayload(args: {
+export function createAgentEndStreamEvent(args: {
   agentName: string;
   agentRunId: string;
   success: boolean;
   durationMs: number;
   hierarchy: ExecutionHierarchy;
   usage?: AgentUsageEntry;
-}): Payload<"agent-end"> {
+}): StreamEvent<"agent-end"> {
   return {
     type: "agent-end",
     data: args,
   };
 }
 
-export function createToolStartPayload(args: {
+export function createToolStartStreamEvent(args: {
   toolName: string;
   toolCallId: string;
   hierarchy: ExecutionHierarchy;
-}): Payload<"tool-start"> {
+}): StreamEvent<"tool-start"> {
   return {
     type: "tool-start",
     data: args,
   };
 }
 
-export function createToolEndPayload(args: {
+export function createToolEndStreamEvent(args: {
   toolName: string;
   toolCallId: string;
   success: boolean;
   durationMs: number;
   hierarchy: ExecutionHierarchy;
-}): Payload<"tool-end"> {
+}): StreamEvent<"tool-end"> {
   return {
     type: "tool-end",
     data: args,
