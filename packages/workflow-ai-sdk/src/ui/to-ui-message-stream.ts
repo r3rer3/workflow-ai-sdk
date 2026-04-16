@@ -1,44 +1,52 @@
-import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type InferUIMessageChunk,
+} from "ai";
 
 import type {
   WorkflowDataParts,
   WorkflowExecution,
-  WorkflowUIChunk,
   WorkflowUIMessage,
 } from "../runtime/types";
 
-export interface ToUIMessageStreamOptions {
-  clientFilter?: (chunk: WorkflowUIChunk) => boolean;
+export interface ToUIMessageStreamOptions<TMessage extends WorkflowUIMessage> {
+  clientFilter?: (chunk: InferUIMessageChunk<TMessage>) => boolean;
 }
 
 type WorkflowDataPartName = keyof WorkflowDataParts & string;
 
-type WorkflowDataChunk<TName extends WorkflowDataPartName> = Extract<
-  WorkflowUIChunk,
-  { type: `data-${TName}` }
->;
+type WorkflowDataChunk<
+  TName extends WorkflowDataPartName,
+  TMessage extends WorkflowUIMessage,
+> = Extract<InferUIMessageChunk<TMessage>, { type: `data-${TName}` }>;
 
-function createWorkflowDataChunk<TName extends WorkflowDataPartName>(
+function createWorkflowDataChunk<
+  TName extends WorkflowDataPartName,
+  TMessage extends WorkflowUIMessage,
+>(
   name: TName,
   data: WorkflowDataParts[TName],
-): WorkflowDataChunk<TName> {
+): WorkflowDataChunk<TName, TMessage> {
   return {
-    type: `data-${name}` as `data-${TName}`,
+    type: `data-${name}`,
     data,
-  } as WorkflowDataChunk<TName>;
+  } as WorkflowDataChunk<TName, TMessage>;
 }
 
-export class WorkflowUIStream {
+export class WorkflowUIStream<
+  TMessage extends WorkflowUIMessage = WorkflowUIMessage,
+> {
   readonly runId: string;
-  readonly stream: ReadableStream<WorkflowUIChunk>;
+  readonly stream: ReadableStream<InferUIMessageChunk<TMessage>>;
 
   constructor(
-    execution: WorkflowExecution<any>,
-    options?: ToUIMessageStreamOptions,
+    execution: WorkflowExecution<TMessage>,
+    options?: ToUIMessageStreamOptions<TMessage>,
   ) {
     this.runId = execution.runId;
 
-    this.stream = createUIMessageStream<WorkflowUIMessage>({
+    this.stream = createUIMessageStream({
       originalMessages: execution.messages,
       execute: async ({ writer }) => {
         const reader = execution.stream.getReader();
@@ -77,9 +85,11 @@ export class WorkflowUIStream {
   }
 }
 
-export async function toUIMessageStream(
-  execution: WorkflowExecution<any> | Promise<WorkflowExecution<any>>,
-  options?: ToUIMessageStreamOptions,
-): Promise<WorkflowUIStream> {
+export async function toUIMessageStream<
+  TMessage extends WorkflowUIMessage = WorkflowUIMessage,
+>(
+  execution: WorkflowExecution<TMessage> | Promise<WorkflowExecution<TMessage>>,
+  options?: ToUIMessageStreamOptions<TMessage>,
+): Promise<WorkflowUIStream<TMessage>> {
   return new WorkflowUIStream(await execution, options);
 }

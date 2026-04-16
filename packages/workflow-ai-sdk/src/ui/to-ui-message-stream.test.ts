@@ -26,7 +26,7 @@ describe("toUIMessageStream", () => {
       resourceId: "resource_1",
       mode: "abortable",
       messages: [],
-      cancel() { },
+      cancel() {},
       stream: new ReadableStream({
         start(controller) {
           controller.enqueue({
@@ -84,5 +84,59 @@ describe("toUIMessageStream", () => {
       "data-custom-event",
       "text-start",
     ]);
+  });
+
+  it("filters ui chunks and accepts promised executions", async () => {
+    const execution: WorkflowExecution<WorkflowUIMessage> = {
+      workflowName: "demo",
+      runId: "run_2",
+      threadId: "thread_2",
+      resourceId: "resource_2",
+      mode: "abortable",
+      messages: [],
+      cancel() {},
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: "workflow-start",
+            data: {
+              workflowName: "demo",
+              runId: "run_2",
+              threadId: "thread_2",
+              resourceId: "resource_2",
+              mode: "abortable",
+              resumed: false,
+              hierarchy: {
+                workflowName: "demo",
+                workflowRunId: "run_2",
+              },
+            },
+          });
+          controller.enqueue({
+            type: "ui-message-chunk",
+            data: {
+              chunk: {
+                type: "text-start",
+                id: "text_1",
+              },
+              hierarchy: {
+                workflowName: "demo",
+                workflowRunId: "run_2",
+              },
+            },
+          });
+          controller.close();
+        },
+      }),
+    };
+
+    const uiStream = await toUIMessageStream(Promise.resolve(execution), {
+      clientFilter(chunk) {
+        return chunk.type !== "text-start";
+      },
+    });
+    const chunks = await collect(uiStream.stream);
+
+    expect(chunks.map((chunk) => chunk.type)).toEqual(["data-workflow-start"]);
   });
 });
