@@ -1,19 +1,17 @@
 import type {
-  AgentEndEventData,
-  AgentStartEventData,
   AgentUsageEntry,
   ExecutionHierarchy,
-  ToolEndEventData,
-  ToolStartEventData,
-  WorkflowAbortedEventData,
   WorkflowCustomEventData,
+  WorkflowDataParts,
   WorkflowEndEventData,
-  WorkflowErrorEventData,
   WorkflowExecutionMode,
   WorkflowPausedEventData,
-  WorkflowStartEventData,
-  WorkflowStepEventData,
 } from "./types";
+
+type Payload<TType extends keyof WorkflowDataParts> = {
+  type: TType;
+  data: WorkflowDataParts[TType];
+};
 
 export function createWorkflowHierarchy(
   workflowName: string,
@@ -49,7 +47,7 @@ export function extendHierarchyWithTool(
   };
 }
 
-export function createWorkflowStartEvent(args: {
+export function createWorkflowStartPayload(args: {
   workflowName: string;
   runId: string;
   threadId: string;
@@ -57,59 +55,47 @@ export function createWorkflowStartEvent(args: {
   mode: WorkflowExecutionMode;
   resumed: boolean;
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "workflow-start";
-  data: WorkflowStartEventData;
-} {
+}): Payload<"workflow-start"> {
   return {
     type: "workflow-start",
     data: args,
   };
 }
 
-export function createWorkflowStepEvent(args: {
+export function createWorkflowStepPayload(args: {
   workflowName: string;
   runId: string;
   stepName: string;
   eventType: string;
   inputEventTypes: string[];
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "workflow-step";
-  data: WorkflowStepEventData;
-} {
+}): Payload<"workflow-step"> {
   return {
     type: "workflow-step",
     data: args,
   };
 }
 
-export function createWorkflowEndEvent(args: {
+export function createWorkflowEndPayload(args: {
   workflowName: string;
   runId: string;
   durationMs: number;
   result?: WorkflowEndEventData["result"];
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "workflow-end";
-  data: WorkflowEndEventData;
-} {
+}): Payload<"workflow-end"> {
   return {
     type: "workflow-end",
     data: args,
   };
 }
 
-export function createWorkflowErrorEvent(args: {
+export function createWorkflowErrorPayload(args: {
   workflowName: string;
   runId: string;
   message: string;
   retryable?: boolean;
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "workflow-error";
-  data: WorkflowErrorEventData;
-} {
+}): Payload<"workflow-error"> {
   return {
     type: "workflow-error",
     data: {
@@ -119,106 +105,85 @@ export function createWorkflowErrorEvent(args: {
   };
 }
 
-export function createWorkflowPausedEvent(args: {
+export function createWorkflowPausedPayload(args: {
   workflowName: string;
   runId: string;
   reason: string;
   payload?: WorkflowPausedEventData["payload"];
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "workflow-paused";
-  data: WorkflowPausedEventData;
-} {
+}): Payload<"workflow-paused"> {
   return {
     type: "workflow-paused",
     data: args,
   };
 }
 
-export function createWorkflowAbortedEvent(args: {
+export function createWorkflowAbortedPayload(args: {
   workflowName: string;
   runId: string;
   reason?: string;
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "workflow-aborted";
-  data: WorkflowAbortedEventData;
-} {
+}): Payload<"workflow-aborted"> {
   return {
     type: "workflow-aborted",
     data: args,
   };
 }
 
-export function createCustomEvent(args: {
+export function createCustomPayload(args: {
   name: string;
   data: WorkflowCustomEventData["data"];
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "custom-event";
-  data: WorkflowCustomEventData;
-} {
+}): Payload<"custom-event"> {
   return {
     type: "custom-event",
     data: args,
   };
 }
 
-export function createAgentStartEvent(args: {
+export function createAgentStartPayload(args: {
   agentName: string;
   agentRunId: string;
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "agent-start";
-  data: AgentStartEventData;
-} {
+}): Payload<"agent-start"> {
   return {
     type: "agent-start",
     data: args,
   };
 }
 
-export function createAgentEndEvent(args: {
+export function createAgentEndPayload(args: {
   agentName: string;
   agentRunId: string;
   success: boolean;
   durationMs: number;
   hierarchy: ExecutionHierarchy;
   usage?: AgentUsageEntry;
-}): {
-  type: "agent-end";
-  data: AgentEndEventData;
-} {
+}): Payload<"agent-end"> {
   return {
     type: "agent-end",
     data: args,
   };
 }
 
-export function createToolStartEvent(args: {
+export function createToolStartPayload(args: {
   toolName: string;
   toolCallId: string;
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "tool-start";
-  data: ToolStartEventData;
-} {
+}): Payload<"tool-start"> {
   return {
     type: "tool-start",
     data: args,
   };
 }
 
-export function createToolEndEvent(args: {
+export function createToolEndPayload(args: {
   toolName: string;
   toolCallId: string;
   success: boolean;
   durationMs: number;
   hierarchy: ExecutionHierarchy;
-}): {
-  type: "tool-end";
-  data: ToolEndEventData;
-} {
+}): Payload<"tool-end"> {
   return {
     type: "tool-end",
     data: args,
