@@ -1,10 +1,10 @@
 import { type Tool, type ToolExecutionOptions, tool } from "ai";
 
 import {
-  createToolEndEvent,
-  createToolStartEvent,
+  createToolEndStreamEvent,
+  createToolStartStreamEvent,
   extendHierarchyWithTool,
-} from "../runtime/events";
+} from "../runtime/create-stream-event";
 import type { RuntimeContext, WorkflowUIMessage } from "../runtime/types";
 
 type MaybePromise<T> = Promise<T> | T;
@@ -55,7 +55,7 @@ export function createWorkflowTool<
         startedAt = Date.now();
 
         context.emit(
-          createToolStartEvent({
+          createToolStartStreamEvent({
             toolName: config.name,
             toolCallId: args.toolCallId,
             hierarchy: extendHierarchyWithTool(
@@ -70,59 +70,51 @@ export function createWorkflowTool<
       },
     };
 
-    const wrappedTool = (
-      executeWithContext
-        ? tool<TInput, TOutput>({
-          ...baseTool,
-          execute: async (input: TInput, options: ToolExecutionOptions) => {
-            try {
-              const result = await executeWithContext(
-                input,
-                options,
-                context,
-              );
+    const wrappedTool = executeWithContext
+      ? tool({
+        ...baseTool,
+        execute: async (input: TInput, options: ToolExecutionOptions) => {
+          const hierarchy = extendHierarchyWithTool(
+            context.getHierarchy(),
+            config.name,
+            options.toolCallId,
+          );
 
-              context.emit(
-                createToolEndEvent({
-                  toolName: config.name,
-                  toolCallId: options.toolCallId,
-                  success: true,
-                  durationMs: Date.now() - startedAt,
-                  hierarchy: extendHierarchyWithTool(
-                    context.getHierarchy(),
-                    config.name,
-                    options.toolCallId,
-                  ),
-                }),
-              );
+          try {
+            const result = await executeWithContext(input, options, context);
 
-              return result as TOutput;
-            } catch (error) {
-              context.emit(
-                createToolEndEvent({
-                  toolName: config.name,
-                  toolCallId: options.toolCallId,
-                  success: false,
-                  durationMs: Date.now() - startedAt,
-                  hierarchy: extendHierarchyWithTool(
-                    context.getHierarchy(),
-                    config.name,
-                    options.toolCallId,
-                  ),
-                }),
-              );
+            context.emit(
+              createToolEndStreamEvent({
+                toolName: config.name,
+                toolCallId: options.toolCallId,
+                success: true,
+                durationMs: Date.now() - startedAt,
+                hierarchy,
+              }),
+            );
 
-              throw error;
-            }
-          },
-        } as Tool<TInput, TOutput>)
-        : tool(baseTool as Tool<TInput, never>)
-    ) as ReturnType<WorkflowTool<TInput, TOutput, TState, TMessage>>;
+            return result;
+          } catch (error) {
+            context.emit(
+              createToolEndStreamEvent({
+                toolName: config.name,
+                toolCallId: options.toolCallId,
+                success: false,
+                durationMs: Date.now() - startedAt,
+                hierarchy,
+              }),
+            );
 
-    wrappedTool.name = config.name;
-    wrappedTool.description = config.description;
-    wrappedTool.title = config.title;
+            throw error;
+          }
+        },
+      } as Tool<TInput, TOutput>)
+      : tool(baseTool as Tool<TInput, TOutput>);
 
-    return wrappedTool;
+    return Object.assign(wrappedTool, {
+      name: config.name,
+      description: config.description,
+      title: config.title,
+    });
   };
 }

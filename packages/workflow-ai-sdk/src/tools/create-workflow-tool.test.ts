@@ -4,65 +4,81 @@ import type {
   RuntimeContext,
   WorkflowDispatchOperation,
   WorkflowDispatchStream,
+  WorkflowStreamEvent,
+  WorkflowUIMessage,
 } from "../index";
 import { createWorkflowHierarchy, createWorkflowTool } from "../index";
 
+function createEmptyStream(): WorkflowDispatchStream {
+  const stream: WorkflowDispatchStream = {
+    filter() {
+      return stream;
+    },
+    until() {
+      return stream;
+    },
+    async toArray() {
+      return [];
+    },
+    async *[Symbol.asyncIterator]() { },
+    toAsyncIterator() {
+      return this[Symbol.asyncIterator]();
+    },
+  };
+
+  return stream;
+}
+
+function createDispatch(): WorkflowDispatchOperation {
+  const done = Promise.resolve();
+  const stream = createEmptyStream();
+
+  return Object.assign(done, {
+    done,
+    stream,
+  });
+}
+
+function createContext<TState extends Record<string, unknown>>(state: TState) {
+  const emitted: WorkflowStreamEvent[] = [];
+  const context: RuntimeContext<TState, WorkflowUIMessage> = {
+    runId: "run_1",
+    threadId: "thread_1",
+    resourceId: "resource_1",
+    mode: "abortable",
+    signal: new AbortController().signal,
+    state,
+    messages: [],
+    executionState: {
+      state,
+      messages: [],
+    },
+    stream: createEmptyStream(),
+    emit(event) {
+      emitted.push(event);
+    },
+    dispatch: createDispatch,
+    checkpoint: async () => undefined,
+    pause(value) {
+      return value;
+    },
+    getHierarchy() {
+      return createWorkflowHierarchy("test-workflow", "run_1");
+    },
+  };
+
+  return {
+    context,
+    emitted,
+  };
+}
+
 describe("createWorkflowTool", () => {
   it("emits tool lifecycle events and can update workflow state", async () => {
-    const emitted: string[] = [];
-    const createEmptyStream = (): WorkflowDispatchStream => {
-      const stream: WorkflowDispatchStream = {
-        filter() {
-          return stream;
-        },
-        until() {
-          return stream;
-        },
-        async toArray() {
-          return [];
-        },
-        async *[Symbol.asyncIterator]() { },
-      };
-
-      return stream;
-    };
-    const dispatch = (): WorkflowDispatchOperation => {
-      const done = Promise.resolve();
-      const stream = createEmptyStream();
-
-      return Object.assign(done, {
-        done,
-        stream,
-      });
-    };
     const state = {
       calls: 0,
     };
-    const context: RuntimeContext<any> = {
-      runId: "run_1",
-      threadId: "thread_1",
-      resourceId: "resource_1",
-      mode: "abortable",
-      signal: new AbortController().signal,
-      state,
-      messages: [],
-      executionState: {
-        state,
-        messages: [],
-      },
-      stream: createEmptyStream(),
-      emit(event) {
-        emitted.push(event.type);
-      },
-      dispatch,
-      checkpoint: async () => undefined,
-      pause(value) {
-        return value;
-      },
-      getHierarchy() {
-        return createWorkflowHierarchy("test-workflow", "run_1");
-      },
-    };
+    const { context, emitted } = createContext(state);
 
     const factory = createWorkflowTool<
       { a: number; b: number },
@@ -103,8 +119,83 @@ describe("createWorkflowTool", () => {
       },
     );
 
+    const toolEndEvent = emitted.find((e) => e.type === "tool-end");
+
     expect(result).toBe(5);
-    expect(emitted).toEqual(["tool-start", "tool-end"]);
+    expect(emitted.map((e) => e.type)).toEqual(["tool-start", "tool-end"]);
+    expect(toolEndEvent?.data.success).toBe(true);
     expect(state.calls).toBe(1);
+  });
+
+  it("emits a failed tool-end event when execution throws", async () => {
+    const { context, emitted } = createContext({
+      calls: 0,
+    });
+    const factory = createWorkflowTool<
+      { a: number },
+      number,
+      { calls: number }
+    >({
+      name: "explode",
+      inputSchema: z.object({
+        a: z.number(),
+      }),
+      execute: async () => {
+        throw new Error("boom");
+      },
+    });
+    const tool = factory(context);
+
+    await tool.onInputStart?.({
+      toolCallId: "call_1",
+      messages: [],
+      abortSignal: undefined,
+    });
+
+    expect(
+      tool.execute?.(
+        {
+          a: 1,
+        },
+        {
+          toolCallId: "call_1",
+          messages: [],
+          abortSignal: undefined,
+        },
+      ),
+    ).rejects.toThrow("boom");
+
+    const toolEndEvent = emitted.find((e) => e.type === "tool-end");
+
+    expect(emitted.map((e) => e.type)).toEqual(["tool-start", "tool-end"]);
+    expect(toolEndEvent?.data.success).toBe(false);
+  });
+
+  it("creates tools without execute handlers", async () => {
+    const { context, emitted } = createContext({
+      calls: 0,
+    });
+    const factory = createWorkflowTool<
+      { city: string },
+      never,
+      { calls: number }
+    >({
+      name: "lookup",
+      inputSchema: z.object({
+        city: z.string(),
+      }),
+      description: "Looks up a city",
+    });
+    const tool = factory(context);
+
+    expect(tool.execute).toBeUndefined();
+
+    await tool.onInputStart?.({
+      toolCallId: "call_1",
+      messages: [],
+      abortSignal: undefined,
+    });
+
+    expect(emitted.map((e) => e.type)).toEqual(["tool-start"]);
   });
 });
