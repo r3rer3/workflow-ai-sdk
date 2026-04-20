@@ -48,6 +48,61 @@ type ToolSetFromWorkflowTools<TOOLS extends WorkflowToolList<any, any>> = {
   : never;
 };
 
+type ToolEndWorkflowStreamEvent<TMessage extends WorkflowUIMessage> = Extract<
+  WorkflowStreamEvent<TMessage>,
+  { type: "tool-end" }
+>;
+
+function createAgentRuntimeContext<
+  TState extends Record<string, unknown>,
+  TMessage extends WorkflowUIMessage,
+>(
+  context: RuntimeContext<TState, TMessage>,
+  hierarchy: ReturnType<RuntimeContext<TState, TMessage>["getHierarchy"]>,
+): {
+  context: RuntimeContext<TState, TMessage>;
+  flushToolEnd: (toolCallId: string) => void;
+  flushPendingToolEnds: () => void;
+} {
+  const pendingToolEnds = new Map<
+    string,
+    ToolEndWorkflowStreamEvent<TMessage>
+  >();
+
+  return {
+    context: {
+      ...context,
+      emit(event) {
+        if (event.type === "tool-end") {
+          pendingToolEnds.set(event.data.toolCallId, event);
+          return;
+        }
+
+        context.emit(event);
+      },
+      getHierarchy() {
+        return hierarchy;
+      },
+    },
+    flushToolEnd(toolCallId) {
+      const event = pendingToolEnds.get(toolCallId);
+      if (!event) {
+        return;
+      }
+
+      pendingToolEnds.delete(toolCallId);
+      context.emit(event);
+    },
+    flushPendingToolEnds() {
+      for (const event of pendingToolEnds.values()) {
+        context.emit(event);
+      }
+
+      pendingToolEnds.clear();
+    },
+  };
+}
+
 function instantiateWorkflowTools<
   TState extends Record<string, unknown>,
   TMessage extends WorkflowUIMessage,
@@ -140,8 +195,12 @@ export function createAgent<
         config.name,
         agentRunId,
       );
+      const agentRuntimeContext = createAgentRuntimeContext(context, hierarchy);
 
-      const tools = instantiateWorkflowTools(config.tools, context);
+      const tools = instantiateWorkflowTools(
+        config.tools,
+        agentRuntimeContext.context,
+      );
 
       const agent =
         config.agent ??
@@ -194,8 +253,17 @@ export function createAgent<
               hierarchy,
             },
           } as WorkflowStreamEvent<TMessage>);
+
+          if (chunk.type === "tool-output-available") {
+            agentRuntimeContext.flushToolEnd(chunk.toolCallId);
+          }
+
+          if (chunk.type === "finish-step") {
+            agentRuntimeContext.flushPendingToolEnds();
+          }
         }
 
+        agentRuntimeContext.flushPendingToolEnds();
         await streamResult.consumeStream();
 
         usage = createUsageEntry({
@@ -223,6 +291,7 @@ export function createAgent<
         };
       } catch (error) {
         usage = createUsageEntry({});
+        agentRuntimeContext.flushPendingToolEnds();
 
         context.emit(
           createAgentEndStreamEvent({

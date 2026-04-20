@@ -1,16 +1,17 @@
 import { describe, expect, it } from "bun:test";
 import { convertArrayToReadableStream, MockLanguageModelV3 } from "ai/test";
+import { z } from "zod";
 
 import {
   createAgent,
   createWorkflowHierarchy,
+  createWorkflowTool,
   type RuntimeContext,
   type WorkflowDispatchOperation,
   type WorkflowDispatchStream,
   type WorkflowStreamEvent,
   type WorkflowUIMessage,
 } from "../index";
-import { simulateReadableStream } from "ai";
 
 function createEmptyStream(): WorkflowDispatchStream {
   const stream: WorkflowDispatchStream = {
@@ -173,6 +174,181 @@ describe("createAgent", () => {
         totalTokens: 14,
       },
     });
+  });
+
+  it("scopes tool lifecycle events to the agent hierarchy during tool loops", async () => {
+    const state = {
+      toolCalls: 0,
+    };
+    const messages: WorkflowUIMessage[] = [
+      {
+        id: "msg_1",
+        role: "user",
+        parts: [
+          {
+            type: "text",
+            text: "Use the tool and then answer",
+          },
+        ],
+      },
+    ];
+    const { context, events } = createContext(state, messages);
+
+    const lookupTool = createWorkflowTool<
+      { topic: string },
+      { note: string },
+      { toolCalls: number }
+    >({
+      name: "lookup_fact",
+      inputSchema: z.object({
+        topic: z.string(),
+      }),
+      execute: async (input, _options, runtimeContext) => {
+        runtimeContext.state.toolCalls += 1;
+        return {
+          note: `fact:${input.topic}`,
+        };
+      },
+    });
+
+    let streamCallCount = 0;
+    const mockModel = new MockLanguageModelV3({
+      doStream: async () => {
+        streamCallCount += 1;
+
+        return streamCallCount === 1
+          ? {
+            stream: convertArrayToReadableStream([
+              {
+                type: "tool-call" as const,
+                toolCallId: "call_1",
+                toolName: "lookup_fact",
+                input: JSON.stringify({
+                  topic: "weather",
+                }),
+              },
+              {
+                type: "finish" as const,
+                finishReason: {
+                  unified: "tool-calls" as const,
+                  raw: "tool-calls",
+                },
+                usage: {
+                  inputTokens: {
+                    total: 4,
+                    noCache: 4,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  outputTokens: {
+                    total: 2,
+                    text: 0,
+                    reasoning: 0,
+                  },
+                },
+              },
+            ]),
+          }
+          : {
+            stream: convertArrayToReadableStream([
+              { type: "text-start" as const, id: "text_1" },
+              {
+                type: "text-delta" as const,
+                id: "text_1",
+                delta: "Done",
+              },
+              { type: "text-end" as const, id: "text_1" },
+              {
+                type: "finish" as const,
+                finishReason: {
+                  unified: "stop" as const,
+                  raw: "stop",
+                },
+                usage: {
+                  inputTokens: {
+                    total: 5,
+                    noCache: 5,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  outputTokens: {
+                    total: 3,
+                    text: 3,
+                    reasoning: 0,
+                  },
+                },
+              },
+            ]),
+          };
+      },
+    });
+
+    const wrapped = createAgent<{ toolCalls: number }>({
+      name: "assistant",
+      model: mockModel,
+      tools: [lookupTool],
+    });
+
+    const result = await wrapped.run(messages, context);
+    await result.streamResult.consumeStream();
+
+    const agentStartEvent = events.find(
+      (event) => event.type === "agent-start",
+    );
+    const toolStartEvent = events.find((event) => event.type === "tool-start");
+    const toolEndEvent = events.find((event) => event.type === "tool-end");
+    const toolStartIndex = events.findIndex(
+      (event) => event.type === "tool-start",
+    );
+    const toolOutputChunkIndex = events.findIndex(
+      (event) =>
+        event.type === "ui-message-chunk" &&
+        event.data.chunk.type === "tool-output-available",
+    );
+    const toolEndIndex = events.findIndex((event) => event.type === "tool-end");
+
+    expect(result.success).toBe(true);
+    expect(state.toolCalls).toBe(1);
+    expect(events.map((event) => event.type)).toEqual([
+      "agent-start",
+      "tool-start",
+      "ui-message-chunk",
+      "ui-message-chunk",
+      "ui-message-chunk",
+      "tool-end",
+      "ui-message-chunk",
+      "ui-message-chunk",
+      "ui-message-chunk",
+      "ui-message-chunk",
+      "ui-message-chunk",
+      "ui-message-chunk",
+      "agent-end",
+    ]);
+    expect(
+      events
+        .filter((event) => event.type === "ui-message-chunk")
+        .map((event) => event.data.chunk.type),
+    ).toEqual([
+      "start-step",
+      "tool-input-available",
+      "tool-output-available",
+      "finish-step",
+      "start-step",
+      "text-start",
+      "text-delta",
+      "text-end",
+      "finish-step",
+    ]);
+    expect(toolStartIndex).toBeLessThan(toolOutputChunkIndex);
+    expect(toolOutputChunkIndex).toBeLessThan(toolEndIndex);
+    expect(toolStartEvent?.data.hierarchy.agentName).toBe("assistant");
+    expect(toolEndEvent?.data.hierarchy.agentName).toBe("assistant");
+    expect(toolStartEvent?.data.hierarchy.agentRunId).toBe(
+      agentStartEvent?.data.agentRunId,
+    );
+    expect(toolEndEvent?.data.hierarchy.agentRunId).toBe(
+      agentStartEvent?.data.agentRunId,
+    );
   });
 
   it("returns a failure result and emits a failed agent-end event when streaming throws", async () => {

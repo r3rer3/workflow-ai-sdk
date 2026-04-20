@@ -8,6 +8,9 @@ import {
 import type { RuntimeContext, WorkflowUIMessage } from "../runtime/types";
 
 type MaybePromise<T> = Promise<T> | T;
+type ToolInputAvailableOptions<TInput, TOutput> = Parameters<
+  NonNullable<Tool<TInput, TOutput>["onInputAvailable"]>
+>[0];
 
 export type WorkflowTool<
   TInput = unknown,
@@ -41,31 +44,62 @@ export function createWorkflowTool<
   config: WorkflowToolConfig<TInput, TOutput, TState, TMessage>,
 ): WorkflowTool<TInput, TOutput, TState, TMessage> {
   return (context) => {
-    let startedAt = 0;
+    const startedAtByCallId = new Map<string, number>();
     const {
       name: _name,
       execute: executeWithContext,
+      onInputAvailable,
       onInputStart,
       ...toolConfig
     } = config;
 
-    const baseTool = {
-      ...toolConfig,
-      onInputStart: async (args: ToolExecutionOptions) => {
-        startedAt = Date.now();
+    const emitToolStart = (toolCallId: string) => {
+      if (!startedAtByCallId.has(toolCallId)) {
+        startedAtByCallId.set(toolCallId, Date.now());
 
         context.emit(
           createToolStartStreamEvent({
             toolName: config.name,
-            toolCallId: args.toolCallId,
+            toolCallId,
             hierarchy: extendHierarchyWithTool(
               context.getHierarchy(),
               config.name,
-              args.toolCallId,
+              toolCallId,
             ),
           }),
         );
+      }
+    };
 
+    const emitToolEnd = (toolCallId: string, success: boolean) => {
+      const startedAt = startedAtByCallId.get(toolCallId) ?? Date.now();
+      startedAtByCallId.delete(toolCallId);
+
+      context.emit(
+        createToolEndStreamEvent({
+          toolName: config.name,
+          toolCallId,
+          success,
+          durationMs: Date.now() - startedAt,
+          hierarchy: extendHierarchyWithTool(
+            context.getHierarchy(),
+            config.name,
+            toolCallId,
+          ),
+        }),
+      );
+    };
+
+    const baseTool = {
+      ...toolConfig,
+      onInputAvailable: async (
+        args: ToolInputAvailableOptions<TInput, TOutput>,
+      ) => {
+        emitToolStart(args.toolCallId);
+        await onInputAvailable?.(args);
+      },
+      onInputStart: async (args: ToolExecutionOptions) => {
+        emitToolStart(args.toolCallId);
         await onInputStart?.(args);
       },
     };
@@ -74,36 +108,16 @@ export function createWorkflowTool<
       ? tool({
         ...baseTool,
         execute: async (input: TInput, options: ToolExecutionOptions) => {
-          const hierarchy = extendHierarchyWithTool(
-            context.getHierarchy(),
-            config.name,
-            options.toolCallId,
-          );
+          emitToolStart(options.toolCallId);
 
           try {
             const result = await executeWithContext(input, options, context);
 
-            context.emit(
-              createToolEndStreamEvent({
-                toolName: config.name,
-                toolCallId: options.toolCallId,
-                success: true,
-                durationMs: Date.now() - startedAt,
-                hierarchy,
-              }),
-            );
+            emitToolEnd(options.toolCallId, true);
 
             return result;
           } catch (error) {
-            context.emit(
-              createToolEndStreamEvent({
-                toolName: config.name,
-                toolCallId: options.toolCallId,
-                success: false,
-                durationMs: Date.now() - startedAt,
-                hierarchy,
-              }),
-            );
+            emitToolEnd(options.toolCallId, false);
 
             throw error;
           }

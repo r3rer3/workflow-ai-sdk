@@ -171,6 +171,60 @@ describe("createWorkflowTool", () => {
     expect(toolEndEvent?.data.success).toBe(false);
   });
 
+  it("emits tool-start from onInputAvailable exactly once before execution", async () => {
+    const state = {
+      calls: 0,
+    };
+    const { context, emitted } = createContext(state);
+
+    const factory = createWorkflowTool<
+      { city: string },
+      { forecast: string },
+      { calls: number }
+    >({
+      name: "lookup_weather",
+      inputSchema: z.object({
+        city: z.string(),
+      }),
+      execute: async (input, _options, runtimeContext) => {
+        runtimeContext.state.calls += 1;
+        return {
+          forecast: `Sunny in ${input.city}`,
+        };
+      },
+    });
+
+    const tool = factory(context);
+    await tool.onInputAvailable?.({
+      input: {
+        city: "Boston",
+      },
+      toolCallId: "call_1",
+      messages: [],
+      abortSignal: undefined,
+    });
+
+    const result = await tool.execute?.(
+      {
+        city: "Boston",
+      },
+      {
+        toolCallId: "call_1",
+        messages: [],
+        abortSignal: undefined,
+      },
+    );
+
+    expect(result).toEqual({
+      forecast: "Sunny in Boston",
+    });
+    expect(emitted.map((event) => event.type)).toEqual([
+      "tool-start",
+      "tool-end",
+    ]);
+    expect(state.calls).toBe(1);
+  });
+
   it("creates tools without execute handlers", async () => {
     const { context, emitted } = createContext({
       calls: 0,
