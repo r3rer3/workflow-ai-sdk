@@ -14,3 +14,4 @@ apps/docs/.source
 apps/docs/next-env.d.ts
 apps/examples/.next
 .claude/
+.codex
