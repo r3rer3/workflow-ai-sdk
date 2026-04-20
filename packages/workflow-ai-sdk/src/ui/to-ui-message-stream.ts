@@ -70,6 +70,12 @@ export class WorkflowUIStream<
               writer.write(value.data.chunk);
               break;
             default:
+              if (value.type === "workflow-start") {
+                writer.write({
+                  type: "start",
+                });
+              }
+
               writer.write(createWorkflowDataChunk(value.type, value.data));
           }
         }

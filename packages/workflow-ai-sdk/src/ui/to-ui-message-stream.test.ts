@@ -26,7 +26,7 @@ describe("toUIMessageStream", () => {
       resourceId: "resource_1",
       mode: "abortable",
       messages: [],
-      cancel() {},
+      cancel() { },
       stream: new ReadableStream({
         start(controller) {
           controller.enqueue({
@@ -78,8 +78,9 @@ describe("toUIMessageStream", () => {
     const uiStream = await toUIMessageStream(execution);
     const chunks = await collect(uiStream.stream);
 
-    expect(chunks).toHaveLength(3);
+    expect(chunks).toHaveLength(4);
     expect(chunks.map((chunk) => chunk.type)).toEqual([
+      "start",
       "data-workflow-start",
       "data-custom-event",
       "text-start",
@@ -94,7 +95,7 @@ describe("toUIMessageStream", () => {
       resourceId: "resource_2",
       mode: "abortable",
       messages: [],
-      cancel() {},
+      cancel() { },
       stream: new ReadableStream({
         start(controller) {
           controller.enqueue({
@@ -137,6 +138,9 @@ describe("toUIMessageStream", () => {
     });
     const chunks = await collect(uiStream.stream);
 
-    expect(chunks.map((chunk) => chunk.type)).toEqual(["data-workflow-start"]);
+    expect(chunks.map((chunk) => chunk.type)).toEqual([
+      "start",
+      "data-workflow-start",
+    ]);
   });
 });
