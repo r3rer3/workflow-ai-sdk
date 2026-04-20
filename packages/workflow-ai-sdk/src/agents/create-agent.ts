@@ -11,14 +11,16 @@ import {
   type ToolSet,
   validateUIMessages,
 } from "ai";
+import { nanoid } from "nanoid";
 import {
-  createAgentEndEvent,
-  createAgentStartEvent,
+  createAgentEndStreamEvent,
+  createAgentStartStreamEvent,
   extendHierarchyWithAgent,
-} from "../runtime/events";
+} from "../runtime/create-stream-event";
 import type {
   AgentUsageEntry,
   RuntimeContext,
+  WorkflowStreamEvent,
   WorkflowUIMessage,
 } from "../runtime/types";
 import type { WorkflowTool } from "../tools/create-workflow-tool";
@@ -30,28 +32,38 @@ type WorkflowToolList<
 
 type ToolSetFromWorkflowTools<TOOLS extends WorkflowToolList<any, any>> = {
   [INDEX in keyof TOOLS as TOOLS[INDEX] extends WorkflowTool<
-    infer _TInput,
-    infer _TOutput,
+    any,
+    any,
     infer _TState,
     infer _TMessage
   >
   ? ReturnType<TOOLS[INDEX]>["name"]
   : never]: TOOLS[INDEX] extends WorkflowTool<
-    infer TInput,
-    infer TOutput,
+    any,
+    any,
     infer _TState,
     infer _TMessage
   >
-  ? ReturnType<TOOLS[INDEX]> & {
-    execute?: (
-      input: TInput,
-      options: Parameters<
-        NonNullable<ReturnType<TOOLS[INDEX]>["execute"]>
-      >[1],
-    ) => Promise<TOutput> | TOutput;
-  }
+  ? ReturnType<TOOLS[INDEX]>
   : never;
 };
+
+function instantiateWorkflowTools<
+  TState extends Record<string, unknown>,
+  TMessage extends WorkflowUIMessage,
+  TOOLS extends WorkflowToolList<TState, TMessage>,
+>(
+  tools: TOOLS | undefined,
+  context: RuntimeContext<TState, TMessage>,
+): ToolSetFromWorkflowTools<TOOLS> {
+  const entries =
+    tools?.map((factory) => {
+      const instance = factory(context);
+      return [instance.name, instance] as const;
+    }) ?? [];
+
+  return Object.fromEntries(entries) as ToolSetFromWorkflowTools<TOOLS>;
+}
 
 export interface WorkflowWrappedAgentResult<TOOLS extends ToolSet = ToolSet> {
   success: boolean;
@@ -92,24 +104,16 @@ export interface WorkflowWrappedAgent<
 }
 
 function createUsageEntry(args: {
-  agentName: string;
-  agentRunId: string;
-  durationMs: number;
-  success: boolean;
   totalUsage?: LanguageModelUsage;
   response?: LanguageModelResponseMetadata;
-  finishReason?: string | null;
+  finishReason?: string;
+  rawFinishReason?: string;
 }): AgentUsageEntry {
   return {
-    agentName: args.agentName,
-    agentRunId: args.agentRunId,
     model: args.response?.modelId,
-    promptTokens: args.totalUsage?.inputTokens,
-    completionTokens: args.totalUsage?.outputTokens,
-    totalTokens: args.totalUsage?.totalTokens,
-    finishReason: args.finishReason ?? undefined,
-    durationMs: args.durationMs,
-    success: args.success,
+    totalUsage: args.totalUsage,
+    finishReason: args.finishReason,
+    rawFinishReason: args.rawFinishReason,
   };
 }
 
@@ -129,7 +133,7 @@ export function createAgent<
     name: config.name,
     description: config.description,
     async run(messages, context, options) {
-      const agentRunId = crypto.randomUUID();
+      const agentRunId = nanoid();
       const startedAt = Date.now();
       const hierarchy = extendHierarchyWithAgent(
         context.getHierarchy(),
@@ -137,22 +141,18 @@ export function createAgent<
         agentRunId,
       );
 
-      const tools = (config.tools?.reduce((acc, factory) => {
-        const instance = factory(context);
-        acc[instance.name] = instance;
-        return acc;
-      }, {} as ToolSet) ?? {}) as TOOL_SET;
+      const tools = instantiateWorkflowTools(config.tools, context);
 
       const agent =
         config.agent ??
         new ToolLoopAgent<CALL_OPTIONS, TOOL_SET>({
           ...config,
           id: config.name,
-          tools,
+          tools: tools as unknown as TOOL_SET,
         });
 
       context.emit(
-        createAgentStartEvent({
+        createAgentStartStreamEvent({
           agentName: config.name,
           agentRunId,
           hierarchy,
@@ -193,23 +193,20 @@ export function createAgent<
               chunk,
               hierarchy,
             },
-          });
+          } as WorkflowStreamEvent<TMessage>);
         }
 
         await streamResult.consumeStream();
 
         usage = createUsageEntry({
-          agentName: config.name,
-          agentRunId,
-          durationMs: Date.now() - startedAt,
-          success: true,
           totalUsage: await streamResult.totalUsage,
           response: await streamResult.response,
           finishReason: await streamResult.finishReason,
+          rawFinishReason: await streamResult.rawFinishReason,
         });
 
         context.emit(
-          createAgentEndEvent({
+          createAgentEndStreamEvent({
             agentName: config.name,
             agentRunId,
             success: true,
@@ -225,15 +222,10 @@ export function createAgent<
           usage,
         };
       } catch (error) {
-        usage = createUsageEntry({
-          agentName: config.name,
-          agentRunId,
-          durationMs: Date.now() - startedAt,
-          success: false,
-        });
+        usage = createUsageEntry({});
 
         context.emit(
-          createAgentEndEvent({
+          createAgentEndStreamEvent({
             agentName: config.name,
             agentRunId,
             success: false,
