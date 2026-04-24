@@ -110,7 +110,7 @@ export class DispatchTraceSource {
         subscriber.close();
       }
 
-      return () => {};
+      return () => { };
     }
 
     this.subscribers.add(subscriber);
@@ -122,15 +122,14 @@ export class DispatchTraceSource {
 }
 
 class WorkflowDispatchStreamImpl
-  implements WorkflowDispatchStream<WorkflowDispatchedEvent>
-{
+  implements WorkflowDispatchStream<WorkflowDispatchedEvent> {
   constructor(
     private readonly source: DispatchTraceSource,
     private readonly startIndex: number,
     private readonly recordFilter: DispatchTracePredicate,
     private readonly eventFilter: EventPredicate,
     private readonly stopWhen?: EventPredicate,
-  ) {}
+  ) { }
 
   filter<TType extends string, TData>(
     event: WorkflowEventDefinition<TType, TData>,
@@ -196,7 +195,7 @@ class WorkflowDispatchStreamImpl
       resolve: (value: IteratorResult<WorkflowDispatchedEvent, void>) => void;
       reject: (reason: unknown) => void;
     }> = [];
-    let unsubscribe = () => {};
+    let unsubscribe = () => { };
     let done = false;
     let failure: Error | null = null;
 
