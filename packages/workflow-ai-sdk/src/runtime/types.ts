@@ -332,7 +332,7 @@ export interface DefineWorkflowOptions<
   description?: string;
   trigger: TTrigger;
   finish: TFinish;
-  initialState?: (
+  initialState: (
     args: WorkflowInitialStateFactoryOptions<TInput, TMessage>,
   ) => Promise<TState> | TState;
 }
@@ -354,7 +354,6 @@ export interface WorkflowRunOptions<
   TMessage extends UIMessage,
 > {
   input: TInput;
-  initialState?: TState;
   messages?: TMessage[];
   threadId?: string;
   resourceId?: string;
