@@ -29,7 +29,7 @@ export {
 } from "./runtime/create-stream-event";
 export {
   defineWorkflow,
-  // , pauseWorkflow
+  pauseWorkflow,
 } from "./runtime/define-workflow";
 export {
   createInMemoryWorkflowStore,
@@ -76,21 +76,21 @@ export type {
   WorkflowUIMessage,
 } from "./runtime/types";
 export type {
-  // WorkflowAndExpression,
+  WorkflowAndExpression,
   WorkflowDispatchedEvent,
   WorkflowEventDefinition,
   WorkflowEventSchema,
-  // WorkflowOrderExpression,
-  // WorkflowOrExpression,
+  WorkflowOrderExpression,
+  WorkflowOrExpression,
   WorkflowStepInput,
-  // WorkflowTriggerExpression,
+  WorkflowTriggerExpression,
   WorkflowTriggerLike,
-  // WorkflowTriggerMatch,
+  WorkflowTriggerMatch,
 } from "./runtime/workflow-event";
 export {
-  // And,
-  // Or,
-  // Order,
+  And,
+  Or,
+  Order,
   workflowEvent,
 } from "./runtime/workflow-event";
 export type {
