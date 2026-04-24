@@ -8,15 +8,12 @@ export type WorkflowDispatchedEvent<
   data: TData;
 };
 
-export type WorkflowEventSchema<
-  TInput = unknown,
-  TOutput = TInput,
-> = StandardSchemaV1<TInput, TOutput>;
+export type WorkflowEventSchema<TInput, TOutput = TInput> = StandardSchemaV1<
+  TInput,
+  TOutput
+>;
 
-export interface WorkflowEventDefinition<
-  TType extends string = string,
-  TData = unknown,
-> {
+export interface WorkflowEventDefinition<TType extends string, TData> {
   readonly type: TType;
   readonly schema?: WorkflowEventSchema<unknown, TData>;
   create: (
@@ -26,6 +23,10 @@ export interface WorkflowEventDefinition<
     event: WorkflowDispatchedEvent<string, unknown>,
   ) => event is WorkflowDispatchedEvent<TType, TData>;
 }
+
+export type WorkflowEventPayload<
+  TEvent extends WorkflowEventDefinition<any, any>,
+> = TEvent extends WorkflowEventDefinition<any, infer TData> ? TData : never;
 
 const workflowEventInspectSymbol = Symbol.for("nodejs.util.inspect.custom");
 
@@ -193,4 +194,177 @@ function formatValidationIssues(
       return path ? `${path}: ${issue.message}` : issue.message;
     })
     .join("; ");
+}
+
+export type AnyWorkflowEventDefinition = WorkflowEventDefinition<any, any>;
+
+export interface WorkflowAndExpression<
+  TTriggers extends
+  readonly WorkflowTriggerLike[] = readonly WorkflowTriggerLike[],
+> {
+  readonly kind: "and";
+  readonly triggers: TTriggers;
+}
+
+export interface WorkflowOrExpression<
+  TTriggers extends
+  readonly WorkflowTriggerLike[] = readonly WorkflowTriggerLike[],
+> {
+  readonly kind: "or";
+  readonly triggers: TTriggers;
+}
+
+export interface WorkflowOrderExpression<
+  TTriggers extends
+  readonly WorkflowTriggerLike[] = readonly WorkflowTriggerLike[],
+> {
+  readonly kind: "order";
+  readonly triggers: TTriggers;
+}
+
+export type WorkflowTriggerExpression =
+  | WorkflowAndExpression
+  | WorkflowOrExpression
+  | WorkflowOrderExpression;
+
+export type WorkflowTriggerLike =
+  | AnyWorkflowEventDefinition
+  | WorkflowTriggerExpression
+  | readonly WorkflowTriggerLike[];
+
+type NormalizeWorkflowTriggerTuple<T extends readonly unknown[]> = {
+  [K in keyof T]: T[K] extends WorkflowTriggerLike
+  ? NormalizeWorkflowTrigger<T[K]>
+  : never;
+};
+
+export type NormalizeWorkflowTrigger<T> = T extends AnyWorkflowEventDefinition
+  ? T
+  : T extends WorkflowAndExpression<infer TTriggers>
+  ? WorkflowAndExpression<NormalizeWorkflowTriggerTuple<TTriggers>>
+  : T extends WorkflowOrExpression<infer TTriggers>
+  ? WorkflowOrExpression<NormalizeWorkflowTriggerTuple<TTriggers>>
+  : T extends WorkflowOrderExpression<infer TTriggers>
+  ? WorkflowOrderExpression<NormalizeWorkflowTriggerTuple<TTriggers>>
+  : T extends readonly unknown[]
+  ? WorkflowAndExpression<
+    NormalizeWorkflowTriggerTuple<
+      Extract<T, readonly WorkflowTriggerLike[]>
+    >
+  >
+  : never;
+
+export type WorkflowTriggerMatch<T> =
+  T extends WorkflowEventDefinition<infer TType, infer TData>
+  ? WorkflowDispatchedEvent<TType, TData>
+  : T extends WorkflowAndExpression<infer TTriggers>
+  ? {
+    [K in keyof TTriggers]: WorkflowTriggerMatch<TTriggers[K]>;
+  }
+  : T extends WorkflowOrderExpression<infer TTriggers>
+  ? {
+    [K in keyof TTriggers]: WorkflowTriggerMatch<TTriggers[K]>;
+  }
+  : T extends WorkflowOrExpression<infer TTriggers>
+  ? WorkflowTriggerMatch<TTriggers[number]>
+  : never;
+
+export type WorkflowStepInput<TTrigger extends WorkflowTriggerLike> =
+  TTrigger extends WorkflowEventDefinition<any, infer TData>
+  ? TData
+  : WorkflowTriggerMatch<NormalizeWorkflowTrigger<TTrigger>>;
+
+function normalizeTriggerList<
+  const TTriggers extends readonly WorkflowTriggerLike[],
+>(triggers: TTriggers): NormalizeWorkflowTriggerTuple<TTriggers> {
+  return triggers.map((trigger) =>
+    normalizeWorkflowTrigger(trigger),
+  ) as NormalizeWorkflowTriggerTuple<TTriggers>;
+}
+
+export function isWorkflowEventDefinition(
+  value: unknown,
+): value is AnyWorkflowEventDefinition {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    "create" in value &&
+    "is" in value
+  );
+}
+
+export function isWorkflowTriggerExpression(
+  value: unknown,
+): value is WorkflowTriggerExpression {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    "triggers" in value &&
+    Array.isArray(value.triggers) &&
+    (value.kind === "and" || value.kind === "or" || value.kind === "order")
+  );
+}
+
+export function normalizeWorkflowTrigger<T extends WorkflowTriggerLike>(
+  trigger: T,
+): NormalizeWorkflowTrigger<T> {
+  if (Array.isArray(trigger)) {
+    return And(trigger) as NormalizeWorkflowTrigger<T>;
+  }
+
+  if (isWorkflowTriggerExpression(trigger)) {
+    switch (trigger.kind) {
+      case "and":
+        return And(trigger.triggers) as NormalizeWorkflowTrigger<T>;
+      case "or":
+        return Or(trigger.triggers) as NormalizeWorkflowTrigger<T>;
+      case "order":
+        return Order(trigger.triggers) as NormalizeWorkflowTrigger<T>;
+    }
+  }
+
+  return trigger as NormalizeWorkflowTrigger<T>;
+}
+
+export function And<const TTriggers extends readonly WorkflowTriggerLike[]>(
+  triggers: TTriggers,
+): WorkflowAndExpression<NormalizeWorkflowTriggerTuple<TTriggers>> {
+  return {
+    kind: "and",
+    triggers: normalizeTriggerList(triggers),
+  };
+}
+
+export function Or<const TTriggers extends readonly WorkflowTriggerLike[]>(
+  triggers: TTriggers,
+): WorkflowOrExpression<NormalizeWorkflowTriggerTuple<TTriggers>> {
+  return {
+    kind: "or",
+    triggers: normalizeTriggerList(triggers),
+  };
+}
+
+export function Order<const TTriggers extends readonly WorkflowTriggerLike[]>(
+  triggers: TTriggers,
+): WorkflowOrderExpression<NormalizeWorkflowTriggerTuple<TTriggers>> {
+  return {
+    kind: "order",
+    triggers: normalizeTriggerList(triggers),
+  };
+}
+
+export function describeWorkflowTrigger(trigger: WorkflowTriggerLike): string {
+  const normalized = normalizeWorkflowTrigger(trigger);
+
+  if (isWorkflowEventDefinition(normalized)) {
+    return normalized.type;
+  }
+
+  const children = normalized.triggers
+    .map((child) => describeWorkflowTrigger(child))
+    .join(", ");
+
+  return `${normalized.kind}(${children})`;
 }
