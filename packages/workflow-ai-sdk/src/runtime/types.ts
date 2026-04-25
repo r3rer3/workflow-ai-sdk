@@ -235,7 +235,6 @@ export interface WorkflowCheckpoint<
   threadId: string;
   resourceId: string;
   executionState: WorkflowExecutionState<TState, TMessage>;
-  pendingEvents: WorkflowDispatchedEvent[];
   pause?: WorkflowPause;
   metadata?: JsonObject;
   runtime?: WorkflowRuntimeCheckpoint;
@@ -295,7 +294,6 @@ export interface RuntimeContext<
   emit: (event: WorkflowStreamEvent<TMessage>) => void;
   dispatch: (...events: WorkflowDispatchedEvent[]) => WorkflowDispatchOperation;
   checkpoint: () => Promise<void>;
-  pause: (pause: WorkflowPause) => WorkflowPause;
   getHierarchy: () => ExecutionHierarchy;
 }
 
