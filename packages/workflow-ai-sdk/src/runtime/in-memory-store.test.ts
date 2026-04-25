@@ -1,14 +1,12 @@
 import { describe, expect, it } from "bun:test";
-
+import { createWorkflowStartStreamEvent } from "./create-stream-event";
 import { createInMemoryWorkflowStore } from "./in-memory-store";
 import type {
   WorkflowCheckpoint,
   WorkflowExecutionState,
   WorkflowRunRecord,
-  WorkflowStreamEvent,
   WorkflowUIMessage,
 } from "./types";
-import { createWorkflowStartStreamEvent } from "./create-stream-event";
 
 type TestState = {
   count: number;
@@ -80,14 +78,6 @@ function createCheckpoint(
     threadId: "thread_1",
     resourceId: "resource_1",
     executionState: createExecutionState(),
-    pendingEvents: [
-      {
-        type: "step.ready",
-        data: {
-          step: 1,
-        },
-      },
-    ],
     pause: {
       kind: "pause",
       reason: "awaiting-input",
@@ -304,10 +294,6 @@ describe("InMemoryWorkflowStore", () => {
     checkpoint.executionState.state.nested.label = "mutated";
     // biome-ignore lint/style/noNonNullAssertion: guaranteed by createCheckpoint to have at least one message
     checkpoint.executionState.messages[0]!.id = "msg_changed";
-    // biome-ignore lint/style/noNonNullAssertion: guaranteed by createCheckpoint to have pending events
-    checkpoint.pendingEvents[0]!.data = {
-      step: 99,
-    };
 
     const loaded = await store.loadCheckpoint("run_1");
 
