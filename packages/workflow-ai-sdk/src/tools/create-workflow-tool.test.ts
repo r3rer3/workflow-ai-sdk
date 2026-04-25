@@ -40,7 +40,7 @@ function createDispatch(): WorkflowDispatchOperation {
 }
 
 function createContext<TState extends Record<string, unknown>>(state: TState) {
-  const emitted: WorkflowStreamEvent[] = [];
+  const emitted: WorkflowStreamEvent<WorkflowUIMessage>[] = [];
   const context: RuntimeContext<TState, WorkflowUIMessage> = {
     runId: "run_1",
     threadId: "thread_1",
@@ -59,9 +59,6 @@ function createContext<TState extends Record<string, unknown>>(state: TState) {
     },
     dispatch: createDispatch,
     checkpoint: async () => undefined,
-    pause(value) {
-      return value;
-    },
     getHierarchy() {
       return createWorkflowHierarchy("test-workflow", "run_1");
     },

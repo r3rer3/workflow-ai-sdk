@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import {
   createAgent,
-  createStep,
   createWorkflowTool,
   defineWorkflow,
   type WorkflowStreamEvent,
@@ -323,107 +322,98 @@ describe("multi-agent workflow e2e", () => {
       model: createSynthesisModel(),
     });
 
-    const workflow = defineWorkflow<
-      never,
-      MultiAgentState,
-      {
-        findings: ResearchFinding[];
-        summary: string;
-      }
-    >({
+    const workflow = defineWorkflow({
       name: "multi-agent-workflow-e2e",
       trigger: startEvent,
       finish: endEvent,
-      initialState() {
+      initialState(): MultiAgentState {
         return {
           findings: {},
         };
       },
-      steps: [
-        createStep(
-          startEvent,
-          async (context) => {
-            const branches = branchIds.map((branchId) =>
-              context.dispatch(
-                branchEvent.create({
-                  branchId,
-                }),
-              ),
+    })
+      .step(
+        startEvent,
+        async (context) => {
+          const branches = branchIds.map((branchId) =>
+            context.dispatch(
+              branchEvent.create({
+                branchId,
+              }),
+            ),
+          );
+
+          await Promise.all(branches);
+          return aggregateEvent.create();
+        },
+        {
+          name: "dispatch-branches",
+        },
+      )
+      .step(
+        branchEvent,
+        async (context, event) => {
+          const agent = researchAgents[event.branchId];
+
+          await agent.run(
+            [
+              {
+                id: `msg_${event.branchId}`,
+                role: "user",
+                parts: [
+                  {
+                    type: "text",
+                    text: `Run branch ${event.branchId}`,
+                  },
+                ],
+              },
+            ],
+            context,
+          );
+        },
+        {
+          name: "run-branch",
+        },
+      )
+      .step(
+        aggregateEvent,
+        async (context) => {
+          const findings = branchIds
+            .map((branchId) => context.state.findings[branchId])
+            .filter(
+              (finding): finding is ResearchFinding => finding !== undefined,
             );
 
-            await Promise.all(branches);
-            return aggregateEvent.create();
-          },
-          {
-            name: "dispatch-branches",
-          },
-        ),
-        createStep(
-          branchEvent,
-          async (context, event) => {
-            const agent = researchAgents[event.branchId];
+          const result = await synthesisAgent.run(
+            [
+              {
+                id: "msg_summary",
+                role: "user",
+                parts: [
+                  {
+                    type: "text",
+                    text: findings
+                      .map(
+                        (finding) =>
+                          `${finding.agentName}:${finding.toolName}:${finding.note}`,
+                      )
+                      .join("\n"),
+                  },
+                ],
+              },
+            ],
+            context,
+          );
 
-            await agent.run(
-              [
-                {
-                  id: `msg_${event.branchId}`,
-                  role: "user",
-                  parts: [
-                    {
-                      type: "text",
-                      text: `Run branch ${event.branchId}`,
-                    },
-                  ],
-                },
-              ],
-              context,
-            );
-          },
-          {
-            name: "run-branch",
-          },
-        ),
-        createStep(
-          aggregateEvent,
-          async (context) => {
-            const findings = branchIds
-              .map((branchId) => context.state.findings[branchId])
-              .filter(
-                (finding): finding is ResearchFinding => finding !== undefined,
-              );
-
-            const result = await synthesisAgent.run(
-              [
-                {
-                  id: "msg_summary",
-                  role: "user",
-                  parts: [
-                    {
-                      type: "text",
-                      text: findings
-                        .map(
-                          (finding) =>
-                            `${finding.agentName}:${finding.toolName}:${finding.note}`,
-                        )
-                        .join("\n"),
-                    },
-                  ],
-                },
-              ],
-              context,
-            );
-
-            return endEvent.create({
-              findings,
-              summary: await result.streamResult.text,
-            });
-          },
-          {
-            name: "synthesize",
-          },
-        ),
-      ],
-    });
+          return endEvent.create({
+            findings,
+            summary: await result.streamResult.text,
+          });
+        },
+        {
+          name: "synthesize",
+        },
+      );
 
     const execution = await workflow.run({
       mode: "abortable",

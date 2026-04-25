@@ -1,15 +1,12 @@
 import { describe, expect, it } from "bun:test";
-
 import {
-  type AgentMailboxMessage,
-  createAgentMailbox,
-} from "./agent-mailbox";
-import {
-  type WorkflowDispatchStream,
+  createWorkflowHierarchy,
   type RuntimeContext,
   type WorkflowDispatchOperation,
-  createWorkflowHierarchy,
+  type WorkflowDispatchStream,
+  type WorkflowUIMessage,
 } from "../index";
+import { type AgentMailboxMessage, createAgentMailbox } from "./agent-mailbox";
 
 describe("createAgentMailbox", () => {
   it("stores messages, emits custom events, and filters inboxes", () => {
@@ -42,10 +39,10 @@ describe("createAgentMailbox", () => {
     const state: {
       mailbox: AgentMailboxMessage[];
     } = {
-      mailbox: []
+      mailbox: [],
     };
 
-    const context: RuntimeContext<typeof state> = {
+    const context: RuntimeContext<typeof state, WorkflowUIMessage> = {
       runId: "run_1",
       threadId: "thread_1",
       resourceId: "resource_1",
@@ -63,9 +60,6 @@ describe("createAgentMailbox", () => {
       stream,
       dispatch,
       checkpoint: async () => undefined,
-      pause(value) {
-        return value;
-      },
       getHierarchy() {
         return createWorkflowHierarchy("mailbox-test", "run_1");
       },
