@@ -17,7 +17,7 @@ type Equal<Left, Right> =
   ? true
   : false;
 
-type Expect<T extends true> = T;
+function assertType<_T extends true>() { }
 
 async function collectStream<T>(stream: ReadableStream<T>): Promise<T[]> {
   const reader = stream.getReader();
@@ -77,10 +77,9 @@ describe("defineWorkflow", () => {
 
     type InferredInput = Parameters<typeof workflow.run>[0]["input"];
     type InferredResult = ReturnType<typeof workflow.finish.create>["data"];
-    type _InputMatchesTrigger = Expect<Equal<InferredInput, { seed: number }>>;
-    type _ResultMatchesFinish = Expect<
-      Equal<InferredResult, { total: number }>
-    >;
+
+    assertType<Equal<InferredInput, { seed: number }>>();
+    assertType<Equal<InferredResult, { total: number }>>();
 
     const execution = await workflow.run({
       input: {
@@ -126,11 +125,10 @@ describe("defineWorkflow", () => {
     });
 
     type RunOptions = Parameters<typeof workflow.run>[0];
-    type _InputIsOmitted = Expect<
-      Equal<"input" extends keyof RunOptions ? true : false, false>
-    >;
     type InferredResult = ReturnType<typeof workflow.finish.create>["data"];
-    type _ResultIsNever = Expect<Equal<InferredResult, never>>;
+
+    assertType<Equal<"input" extends keyof RunOptions ? true : false, false>>();
+    assertType<Equal<InferredResult, never>>();
 
     expect(workflow.finish.create().type).toBe("end");
   });
@@ -1031,6 +1029,115 @@ describe("defineWorkflow", () => {
     });
   });
 
+  it("lets steps observe descendant dispatches through context.stream", async () => {
+    const startEvent = workflowEvent("start");
+    const childEvent = workflowEvent(
+      "child",
+      z.object({
+        count: z.number(),
+      }),
+    );
+    const grandchildEvent = workflowEvent("grandchild");
+    const endEvent = workflowEvent(
+      "end",
+      z.object({
+        seen: z.array(z.string()),
+      }),
+    );
+
+    const workflow = defineWorkflow({
+      name: "context-stream",
+      trigger: startEvent,
+      finish: endEvent,
+      initialState(): Record<string, never> {
+        return {};
+      },
+    })
+      .step(startEvent, async (context) => {
+        const descendantEventsPromise = context.stream
+          .until(grandchildEvent)
+          .toArray();
+        const operation = context.dispatch(
+          childEvent.create({
+            count: 1,
+          }),
+        );
+
+        await operation;
+
+        return endEvent.create({
+          seen: (await descendantEventsPromise).map((event) => event.type),
+        });
+      })
+      .step(childEvent, (_context, event) => {
+        if (event.count === 1) {
+          return grandchildEvent.create();
+        }
+      })
+      .step(grandchildEvent, () => { });
+
+    const execution = await workflow.run({
+      mode: "abortable",
+    });
+    const events = await collectStream(execution.stream);
+
+    expect(events.at(-1)).toMatchObject({
+      type: "workflow-end",
+      data: {
+        result: {
+          seen: ["child", "grandchild"],
+        },
+      },
+    });
+  });
+
+  it("returns an empty branch stream when a dispatch has no events", async () => {
+    const startEvent = workflowEvent("start");
+    const endEvent = workflowEvent(
+      "end",
+      z.object({
+        dispatched: z.number(),
+      }),
+    );
+
+    const workflow = defineWorkflow({
+      name: "empty-dispatch-stream",
+      trigger: startEvent,
+      finish: endEvent,
+      initialState(): Record<string, never> {
+        return {};
+      },
+    }).step(startEvent, async (context) => {
+      const operation = context.dispatch();
+      const branchEvents = await operation.stream.toArray();
+
+      await operation;
+
+      return endEvent.create({
+        dispatched: branchEvents.length,
+      });
+    });
+
+    const execution = await workflow.run({
+      mode: "abortable",
+    });
+    const events = await collectStream(execution.stream);
+
+    expect(events.map((event) => event.type)).toEqual([
+      "workflow-start",
+      "workflow-step",
+      "workflow-end",
+    ]);
+    expect(events.at(-1)).toMatchObject({
+      type: "workflow-end",
+      data: {
+        result: {
+          dispatched: 0,
+        },
+      },
+    });
+  });
+
   it("starts child dispatches immediately and exposes a branch stream", async () => {
     const startEvent = workflowEvent("start");
     const childEvent = workflowEvent(
@@ -1107,6 +1214,109 @@ describe("defineWorkflow", () => {
         },
       },
     });
+  });
+
+  it.only("resumes saved checkpoints with pending events", async () => {
+    const startEvent = workflowEvent(
+      "start",
+      z.object({
+        ticket: z.string(),
+      }),
+    );
+    const childEvent = workflowEvent(
+      "child",
+      z.object({
+        label: z.string(),
+      }),
+    );
+    const endEvent = workflowEvent(
+      "end",
+      z.object({
+        processed: z.array(z.string()),
+      }),
+    );
+    const store = createInMemoryWorkflowStore<
+      {
+        processed: string[];
+      },
+      WorkflowUIMessage
+    >();
+
+    const workflow = defineWorkflow({
+      name: "resume-pending-events",
+      trigger: startEvent,
+      finish: endEvent,
+      initialState(): { processed: string[] } {
+        return {
+          processed: [],
+        };
+      },
+    })
+      .step(startEvent, () =>
+        pauseWorkflow({
+          reason: "awaiting-child",
+        }),
+      )
+      .step(childEvent, (context, event) => {
+        context.state.processed.push(event.label);
+
+        return endEvent.create({
+          processed: context.state.processed,
+        });
+      });
+
+    const firstExecution = await workflow.run({
+      input: {
+        ticket: "T-101",
+      },
+      mode: "resumable",
+      store,
+    });
+    await collectStream(firstExecution.stream);
+
+    const checkpoint = store.state.checkpoints.get(firstExecution.runId);
+
+    if (!checkpoint?.runtime) {
+      throw new Error(
+        "Expected a saved runtime checkpoint for the resume test.",
+      );
+    }
+
+    checkpoint.runtime.pendingEvents = [
+      {
+        id: checkpoint.runtime.nextOccurrenceId,
+        event: childEvent.create({
+          label: "queued-child",
+        }),
+      },
+    ];
+    checkpoint.runtime.nextOccurrenceId += 1;
+
+    const resumed = await workflow.resume({
+      runId: firstExecution.runId,
+      store,
+    });
+    const resumedEvents = await collectStream(resumed.stream);
+
+    expect(resumedEvents.map((event) => event.type)).toEqual([
+      "workflow-start",
+      "workflow-step",
+      "workflow-end",
+    ]);
+    expect(resumedEvents.at(-1)).toMatchObject({
+      type: "workflow-end",
+      data: {
+        result: {
+          processed: ["queued-child"],
+        },
+      },
+    });
+    expect(store.getState(firstExecution.runId)?.processed).toEqual([
+      "queued-child",
+    ]);
+    expect(store.state.runs.get(firstExecution.runId)?.status).toBe(
+      "completed",
+    );
   });
 
   it("revalidates restored step history when resuming", async () => {
