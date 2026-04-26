@@ -40,7 +40,6 @@ export type {
   AgentStartEventData,
   AgentUsageEntry,
   DefinedWorkflow,
-  DefineWorkflowOptions,
   ExecutionHierarchy,
   JsonObject,
   JsonPrimitive,
