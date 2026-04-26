@@ -1,3 +1,8 @@
+---
+name: create-tool
+description: Create or update a workflow-aware AI SDK tool. Use when a tool needs workflow context, lifecycle events, or state access.
+---
+
 # create-tool
 
 Use this skill when adding or editing a workflow-aware tool.
