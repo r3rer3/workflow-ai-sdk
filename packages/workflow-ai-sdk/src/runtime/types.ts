@@ -318,23 +318,6 @@ export interface WorkflowStep<
   handler: WorkflowStepHandler<TState, TTrigger, TMessage, TEventData>;
 }
 
-export interface DefineWorkflowOptions<
-  TInput,
-  TState extends Record<string, unknown>,
-  TResult extends JsonValue,
-  TMessage extends UIMessage,
-  TTrigger extends WorkflowEventDefinition<string, TInput>,
-  TFinish extends WorkflowEventDefinition<string, TResult>,
-> {
-  name: string;
-  description?: string;
-  trigger: TTrigger;
-  finish: TFinish;
-  initialState: (
-    args: WorkflowInitialStateFactoryOptions<TInput, TMessage>,
-  ) => Promise<TState> | TState;
-}
-
 export interface WorkflowInitialStateFactoryOptions<
   TInput,
   TMessage extends UIMessage,

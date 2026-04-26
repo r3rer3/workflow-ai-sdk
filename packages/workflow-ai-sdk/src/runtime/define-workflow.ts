@@ -17,7 +17,7 @@ import {
 } from "./dispatch-stream";
 import type {
   DefinedWorkflow,
-  DefineWorkflowOptions,
+  WorkflowInitialStateFactoryOptions,
   JsonObject,
   JsonValue,
   RuntimeContext,
@@ -47,7 +47,6 @@ import {
   validateWorkflowEvent,
   type WorkflowDispatchedEvent,
   type WorkflowEventDefinition,
-  type WorkflowEventPayload,
   WorkflowEventValidationError,
   type WorkflowTriggerLike,
 } from "./workflow-event";
@@ -544,44 +543,30 @@ async function createExecutionState<
 }
 
 export function defineWorkflow<
-  TState extends Record<string, unknown>,
-  TTrigger extends AnyWorkflowEventDefinition,
-  TFinish extends AnyWorkflowEventDefinition,
-  TMessage extends WorkflowUIMessage,
->(
-  options: DefineWorkflowOptions<
-    WorkflowEventPayload<TTrigger>,
-    TState,
-    WorkflowEventPayload<TFinish>,
-    TMessage,
-    TTrigger,
-    TFinish
-  >,
-): DefinedWorkflow<
-  WorkflowEventPayload<TTrigger>,
-  TState,
-  WorkflowEventPayload<TFinish>,
-  TMessage,
-  TTrigger,
-  TFinish
->;
-export function defineWorkflow<
   TInput,
   TState extends Record<string, unknown>,
+  TTriggerType extends string,
   TResult extends JsonValue,
   TMessage extends WorkflowUIMessage,
-  TTrigger extends WorkflowEventDefinition<string, TInput>,
-  TFinish extends WorkflowEventDefinition<string, TResult>,
+  TFinishType extends string,
 >(
-  options: DefineWorkflowOptions<
-    TInput,
-    TState,
-    TResult,
-    TMessage,
-    TTrigger,
-    TFinish
-  >,
-): DefinedWorkflow<TInput, TState, TResult, TMessage, TTrigger, TFinish> {
+  options: {
+    name: string;
+    description?: string;
+    trigger: WorkflowEventDefinition<TTriggerType, TInput>;
+    finish: WorkflowEventDefinition<TFinishType, TResult>;
+    initialState: (
+      args: WorkflowInitialStateFactoryOptions<TInput, TMessage>,
+    ) => Promise<TState> | TState;
+  },
+): DefinedWorkflow<
+  TInput,
+  TState,
+  TResult,
+  TMessage,
+  WorkflowEventDefinition<TTriggerType, TInput>,
+  WorkflowEventDefinition<TFinishType, TResult>
+> {
   const collectedSteps: WorkflowStep<
     TState,
     WorkflowTriggerLike,
@@ -890,6 +875,17 @@ export function defineWorkflow<
       });
     };
 
+    const createCompletedDispatchStream = () => {
+      const source = new DispatchTraceSource();
+      source.close();
+
+      return createWorkflowDispatchStream({
+        source,
+        startIndex: 0,
+        scope: () => true,
+      });
+    };
+
     const dispatchFromOccurrence = (
       occurrence: RuntimeOccurrence,
       events: WorkflowDispatchedEvent[],
@@ -897,11 +893,7 @@ export function defineWorkflow<
       if (events.length === 0) {
         const operation = createDispatchOperation({
           done: Promise.resolve(),
-          stream: createWorkflowDispatchStream({
-            source: traceSource,
-            startIndex: traceSource.size,
-            scope: () => false,
-          }),
+          stream: createCompletedDispatchStream(),
         });
         return Object.assign(operation, {
           queued: Promise.resolve(),
@@ -1338,8 +1330,8 @@ export function defineWorkflow<
     TState,
     TResult,
     TMessage,
-    TTrigger,
-    TFinish
+    WorkflowEventDefinition<TTriggerType, TInput>,
+    WorkflowEventDefinition<TFinishType, TResult>
   > = {
     name: options.name,
     description: options.description,

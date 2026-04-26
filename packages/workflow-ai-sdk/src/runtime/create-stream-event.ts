@@ -6,11 +6,11 @@ import type {
   WorkflowEndEventData,
   WorkflowExecutionMode,
   WorkflowPausedEventData,
-  WorkflowStreamEvent,
+  WorkflowStreamEventFromParts,
 } from "./types";
 
 type StreamEvent<T extends keyof WorkflowDataParts> = Extract<
-  WorkflowStreamEvent,
+  WorkflowStreamEventFromParts,
   { type: T }
 >;
 

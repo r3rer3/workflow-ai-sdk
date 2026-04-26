@@ -27,7 +27,7 @@ type Equal<Left, Right> =
   ? true
   : false;
 
-type Assert<T extends true> = T;
+function assertType<_T extends true>() { }
 
 const alphaEvent = workflowEvent(
   "alpha",
@@ -57,37 +57,35 @@ type AlphaMatch = WorkflowDispatchedEvent<"alpha", { label: string }>;
 type BetaMatch = WorkflowDispatchedEvent<"beta", { count: number }>;
 type DeltaMatch = WorkflowDispatchedEvent<"delta", { step: string }>;
 
-type _normalizeArrayIntoAnd = Assert<
+assertType<
   Equal<
     NormalizeWorkflowTrigger<readonly [typeof alphaEvent, typeof betaEvent]>,
     WorkflowAndExpression<readonly [typeof alphaEvent, typeof betaEvent]>
   >
->;
-type _singleStepInputUsesPayload = Assert<
-  Equal<WorkflowStepInput<typeof alphaEvent>, { label: string }>
->;
-type _arrayStepInputUsesMatchedTuple = Assert<
+>();
+assertType<Equal<WorkflowStepInput<typeof alphaEvent>, { label: string }>>();
+assertType<
   Equal<
     WorkflowStepInput<readonly [typeof alphaEvent, typeof betaEvent]>,
     readonly [AlphaMatch, BetaMatch]
   >
->;
-type _andStepInputUsesMatchedTuple = Assert<
+>();
+assertType<
   Equal<
     WorkflowStepInput<typeof alphaAndBeta>,
     readonly [AlphaMatch, BetaMatch]
   >
->;
-type _orderStepInputUsesMatchedTuple = Assert<
+>();
+assertType<
   Equal<
     WorkflowStepInput<typeof orderedAlphaThenDelta>,
     readonly [AlphaMatch, DeltaMatch]
   >
->;
-type _orStepInputUsesBranchUnion = Assert<
+>();
+assertType<
   Equal<WorkflowStepInput<typeof alphaOrBeta>, AlphaMatch | BetaMatch>
->;
-type _nestedArrayNormalization = Assert<
+>();
+assertType<
   Equal<
     NormalizeWorkflowTrigger<
       readonly [
@@ -102,13 +100,13 @@ type _nestedArrayNormalization = Assert<
       ]
     >
   >
->;
-type _orderedNormalization = Assert<
+>();
+assertType<
   Equal<
     NormalizeWorkflowTrigger<typeof orderedAlphaThenDelta>,
     WorkflowOrderExpression<readonly [typeof alphaEvent, typeof deltaEvent]>
   >
->;
+>();
 
 describe("workflowEvent", () => {
   it("creates decorated events and matches them by type", () => {

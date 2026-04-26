@@ -312,14 +312,19 @@ describe("InMemoryWorkflowStore", () => {
             }),
           ],
         }),
-        pendingEvents: [
-          {
-            type: "step.ready",
-            data: {
-              step: 1,
+        runtime: expect.objectContaining({
+          pendingEvents: [
+            {
+              id: 1,
+              event: {
+                type: "step.ready",
+                data: {
+                  step: 1,
+                },
+              },
             },
-          },
-        ],
+          ],
+        }),
       }),
     );
 

@@ -16,17 +16,13 @@ export type WorkflowEventSchema<TInput, TOutput = TInput> = StandardSchemaV1<
 export interface WorkflowEventDefinition<TType extends string, TData> {
   readonly type: TType;
   readonly schema?: WorkflowEventSchema<unknown, TData>;
-  create: (
+  create(
     ...args: [TData] extends [never] ? [] : [data: TData]
-  ) => WorkflowDispatchedEvent<TType, TData>;
-  is: (
+  ): WorkflowDispatchedEvent<TType, TData>;
+  is(
     event: WorkflowDispatchedEvent<string, unknown>,
-  ) => event is WorkflowDispatchedEvent<TType, TData>;
+  ): event is WorkflowDispatchedEvent<TType, TData>;
 }
-
-export type WorkflowEventPayload<
-  TEvent extends WorkflowEventDefinition<any, any>,
-> = TEvent extends WorkflowEventDefinition<any, infer TData> ? TData : never;
 
 const workflowEventInspectSymbol = Symbol.for("nodejs.util.inspect.custom");
 
