@@ -1,0 +1,12 @@
+---
+title: IDs
+description: runId, threadId, and resourceId stay explicit because they matter operationally.
+---
+
+The library keeps three IDs explicit because they matter operationally:
+
+- `runId` — one workflow execution
+- `threadId` — one conversation thread
+- `resourceId` — the business entity the conversation belongs to (a user, customer, workspace member, document owner, etc)
+
+Reuse the ids your app already has and which are safe to be shown in the client. Do not invent a new `resourceId` space inside route handlers.

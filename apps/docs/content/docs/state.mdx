@@ -1,0 +1,28 @@
+---
+title: Native State
+description: Workflow state is built into the runtime — not middleware, not an add-on.
+---
+
+- Use `context.state` for mutable, workflow-owned state.
+- Use `context.messages` for framework-managed AI SDK UI messages.
+- Use `defineWorkflow({ initialState })` to derive state from the run input,
+  ids, message history, and optional metadata.
+- Use `workflow.run({ input, messages, threadId, resourceId, metadata })` to
+  seed a particular execution. There is no separate run-time
+  `initialState` override parameter today.
+
+```ts
+type CounterInput = { seed: number };
+type CounterState = { total: number };
+
+const workflow = defineWorkflow({
+  // trigger + finish omitted for brevity
+  initialState({ input }: { input: CounterInput }): CounterState {
+    return { total: input.seed };
+  },
+});
+```
+
+If you need different initial state for different callers, make that part of
+the workflow input schema and derive state from `input` inside
+`initialState(...)`.

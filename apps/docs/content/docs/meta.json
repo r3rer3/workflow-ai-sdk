@@ -1,0 +1,20 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "getting-started",
+    "---Core---",
+    "core-concepts",
+    "state",
+    "durability",
+    "ids",
+    "typesafety",
+    "---Integration---",
+    "ai-sdk-integration",
+    "supabase",
+    "---Reference---",
+    "library-traits",
+    "skills-and-examples",
+    "inspirations"
+  ]
+}

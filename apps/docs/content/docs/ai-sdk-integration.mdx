@@ -1,0 +1,21 @@
+---
+title: Tight AI SDK Integration
+description: Workflow wrappers preserve AI SDK lifecycle callbacks, chunk shapes, and UI message protocols.
+---
+
+- Workflow agents wrap AI SDK Agents instead of replacing it. Under the
+  hood, `createAgent(...)` validates UI messages, converts them to model
+  messages, then streams the agent output back as native AI SDK UI chunks.
+- Workflow tools are still AI SDK tools. `createWorkflowTool(...)` adds
+  runtime context plus `tool-start` / `tool-end` lifecycle events without
+  inventing a second tool protocol.
+- `toUIMessageStream(execution)` keeps the response compatible with AI SDK
+  clients such as `useChat`. Standard text, reasoning, source, and tool chunks
+  stay intact.
+- Workflow-specific lifecycle is multiplexed onto the same stream as
+  `data-workflow-*`, `data-agent-*`, `data-tool-*`, and `data-custom-event`
+  parts. The client decides whether to ignore them, render them inline, or use
+  them to drive a separate timeline UI.
+
+This is why the examples app can use a normal chat transport for text while
+still surfacing workflow progress in custom UI components.

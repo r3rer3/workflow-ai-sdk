@@ -1,0 +1,18 @@
+---
+title: Core Concepts
+description: Workflows orchestrate, agents reason, tools act.
+---
+
+The library has three layers:
+
+- **Workflow** — the orchestrator. Owns run state, step boundaries, pause/resume, and lifecycle events.
+- **Agent** — an AI SDK agent execution inside a step. Handles model calls, tool loops, and streamed UI chunks.
+- **Tool** — an AI SDK tool, optionally wrapped to emit workflow lifecycle events and access workflow context.
+
+The workflow decides _when_ something happens. The agent decides _how_ to solve the model-driven part. Tools stay focused on side effects or data access.
+
+```text
+Workflow ──▶ Step ──▶ Agent ──▶ Tool
+     ▲         │         │         │
+     └───── events ◀─────┴─────────┘
+```

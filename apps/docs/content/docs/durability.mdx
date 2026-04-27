@@ -1,0 +1,25 @@
+---
+title: Durability Model
+description: Every workflow run is either abortable or resumable.
+---
+
+Durability is explicit. A workflow run is either `abortable` or `resumable`.
+
+- **abortable** — supports cancellation via `execution.cancel()`. Good for normal chat routes.
+- **resumable** — saves checkpoints after step boundaries, persists pauses, and accepts `workflow.resume({ runId, store, event })`. Good for approval flows and long-running jobs.
+
+In resumable mode:
+
+- `workflow.run({ ..., mode: "resumable", store })` requires a store.
+- returning `pauseWorkflow({ reason, payload })` from a step persists the
+  checkpoint and ends the current stream with `data-workflow-paused`.
+- `workflow.resume({ runId, store, event })` reloads the checkpoint, validates
+  the resume event, and continues from the durable boundary.
+- the runtime automatically checkpoints after step boundaries and on pause,
+  finish, abort, and error. `context.checkpoint()` is only for cases where
+  you need an earlier save within a long step.
+
+The two modes are separate on purpose. They map cleanly onto AI SDK UI
+transport instead of pretending a single route can safely do everything. See
+the `/resume`, `/tool-approval-ai-sdk`, `/tool-approval-workflow`, and `/db`
+examples in `apps/examples` for concrete route shapes.

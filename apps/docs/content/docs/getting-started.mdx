@@ -1,0 +1,63 @@
+---
+title: Getting Started
+description: Install the library and run a minimal workflow end-to-end.
+---
+
+Install the library:
+
+```bash
+bun add workflow-ai-sdk
+```
+
+A minimal workflow looks like this:
+
+```ts
+import {
+  defineWorkflow,
+  toUIMessageStream,
+  workflowEvent,
+} from "workflow-ai-sdk";
+import { z } from "zod";
+
+type ExampleState = {
+  echoes: number;
+};
+
+const start = workflowEvent(
+  "chat.start",
+  z.object({
+    message: z.string(),
+  }),
+);
+const end = workflowEvent(
+  "chat.end",
+  z.object({
+    reply: z.string(),
+  }),
+);
+
+const workflow = defineWorkflow({
+  name: "example",
+  trigger: start,
+  finish: end,
+  initialState(): ExampleState {
+    return { echoes: 0 };
+  },
+})
+  .step(start, (ctx, event) => {
+    ctx.state.echoes += 1;
+    return end.create({ reply: `echo ${ctx.state.echoes}: ${event.message}` });
+  });
+
+const execution = await workflow.run({ input: { message: "hi" }, mode: "abortable" });
+const stream = await toUIMessageStream(execution);
+
+for await (const message of stream) {
+  console.log(message);
+}
+```
+
+`workflowEvent(...)` infers payload types from the schema and the runtime
+re-validates dispatched and resumed events before a step handler sees them.
+
+To inspect working routes instead of a minimal snippet, see [https://github.com/r3rer3/workflow-ai-sdk/tree/master/apps/examples](https://github.com/r3rer3/workflow-ai-sdk/tree/master/apps/examples).

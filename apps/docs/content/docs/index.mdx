@@ -1,0 +1,19 @@
+---
+title: Why This Library
+description: Event-driven workflow ergonomics rebuilt on AI SDK v6 primitives.
+---
+
+workflow-ai-sdk is for AI applications that have outgrown a single
+`streamText(...)` call but do not want to abandon the AI SDK's message
+format, tool protocol, or UI streaming model.
+
+It keeps three concerns aligned:
+
+- event-driven orchestration through `defineWorkflow(...)`
+- model and tool execution through AI SDK agents and tools
+- durable pause/resume through an app-owned `WorkflowStore`
+
+If you want to see the library used end to end before reading every API
+surface, start with [`apps/examples`](https://github.com/r3rer3/workflow-ai-sdk/tree/master/apps/examples). The examples cover
+basic chat, resumable approval flows, tool usage, multi-agent handoff,
+parallel subagents, and Supabase-backed persistence.

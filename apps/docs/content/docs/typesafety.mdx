@@ -1,0 +1,55 @@
+---
+title: Typesafety
+description: workflowEvent schemas and defineWorkflow state inference keep step handlers strongly typed.
+---
+
+`workflowEvent(type, schema)` is the main source of truth for payload types.
+`defineWorkflow(...)` usually infers everything else from:
+
+- the trigger event schema
+- the finish event schema
+- the return type of `initialState(...)`
+
+You only need extra annotations when empty arrays or optional properties would
+otherwise narrow the state too much.
+
+```ts
+import { defineWorkflow, workflowEvent } from "workflow-ai-sdk";
+import { z } from "zod";
+
+type HelloState = {
+  greetings: number;
+};
+
+const start = workflowEvent(
+  "hello.start",
+  z.object({
+    name: z.string(),
+  }),
+);
+const end = workflowEvent(
+  "hello.end",
+  z.object({
+    greeting: z.string(),
+  }),
+);
+
+const workflow = defineWorkflow({
+  name: "hello",
+  trigger: start,
+  finish: end,
+  initialState(): HelloState {
+    return { greetings: 0 };
+  },
+})
+  .step(start, (ctx, event) => {
+    // event is typed as { name: string }
+    ctx.state.greetings += 1;
+    return end.create({ greeting: `hi, ${event.name}` });
+  });
+```
+
+Because event payloads are inferred from the schema, the step handler receives a
+concrete validated type and the workflow signature enforces a matching finish
+event. Any event that fails schema validation is reported as a `workflow-error`
+before the handler runs.
