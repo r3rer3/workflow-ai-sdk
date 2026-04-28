@@ -91,3 +91,126 @@ const lookupTool = createWorkflowTool<
 
 That pattern keeps `context.state` strongly typed while leaving the fully
 inferred zero-generic form available for simpler tools.
+
+## Custom message types
+
+`WorkflowUIMessage` accepts three optional generic parameters so you can attach
+custom metadata, custom data parts, or specific tool types to every message in
+your workflow:
+
+```ts
+WorkflowUIMessage<METADATA, DATA_PARTS, TOOLS>
+```
+
+All three default to the built-in workflow types, so bare `WorkflowUIMessage`
+continues to work as before.
+
+### Extending metadata
+
+Add domain-specific fields alongside the standard workflow metadata:
+
+```ts
+import {
+  type WorkflowMessageMetadata,
+  type WorkflowUIMessage,
+} from "workflow-ai-sdk";
+
+interface MyMetadata extends WorkflowMessageMetadata {
+  projectId: string;
+  priority: "low" | "medium" | "high";
+}
+
+type MyMessage = WorkflowUIMessage<MyMetadata>;
+```
+
+### Typing custom events
+
+`data-custom-event` is not limited to JSON-shaped payloads. Define a
+discriminated union with `WorkflowCustomEvent`, then plug it into
+`WorkflowDataParts<...>`:
+
+```ts
+import {
+  type WorkflowCustomEvent,
+  type WorkflowDataParts,
+  type WorkflowMessageMetadata,
+  type WorkflowUIMessage,
+} from "workflow-ai-sdk";
+
+type ResearchStartedEvent = WorkflowCustomEvent<
+  "research-started",
+  { topic: string; agentName: string }
+>;
+
+type ApprovalRequestedEvent = WorkflowCustomEvent<
+  "approval-requested",
+  { toolName: string; operation: string }
+>;
+
+type MyCustomEvent = ResearchStartedEvent | ApprovalRequestedEvent;
+
+type MyDataParts = WorkflowDataParts<
+  MyCustomEvent,
+  {
+    "progress-update": { percent: number; stage: string };
+  }
+>;
+
+type MyMessage = WorkflowUIMessage<WorkflowMessageMetadata, MyDataParts>;
+```
+
+Now `part.type === "data-custom-event"` narrows `part.data.name` to
+`"research-started" | "approval-requested"` and narrows `part.data.data`
+accordingly.
+
+### Using a custom message type
+
+Pass your message type through `defineWorkflow`, `createAgent`,
+`createWorkflowTool`, and store generics. With workflow tools, the extra
+generic is for workflow context; output still infers from `execute(...)`, and
+you can annotate the `execute(...)` input directly when needed. The type flows
+through the entire pipeline:
+
+```ts
+const store = createInMemoryWorkflowStore<MyState, MyMessage>();
+
+const agent = createAgent<MyState, MyMessage>({
+  name: "assistant",
+  model: openai("gpt-4.1-mini"),
+  instructions: "Answer concisely.",
+});
+
+const workflow = defineWorkflow({
+  name: "my-workflow",
+  trigger: startEvent,
+  finish: endEvent,
+  initialState({ input }): MyState {
+    return { topic: input.topic };
+  },
+});
+```
+
+On the frontend, reuse the same exported alias with AI SDK hooks:
+
+```ts
+const { messages } = useChat<MyMessage>({
+  transport: new DefaultChatTransport({ api: "/api/my-workflow" }),
+});
+
+for (const part of messages.at(-1)?.parts ?? []) {
+  if (part.type !== "data-custom-event") continue;
+
+  if (part.data.name === "approval-requested") {
+    console.log(part.data.data.operation);
+  }
+}
+```
+
+This shared-message-type pattern is how the custom-event union flows all the
+way from `context.emit(...)` on the server to typed rendering in the browser.
+
+The constraint `extends WorkflowMessageMetadata` /
+`extends WorkflowDataParts<any>` ensures your custom type always includes the
+fields the runtime needs. The type system allows any payload type for
+`custom-event.data`, but streamed or persisted payloads should still stay
+transport-safe in practice.

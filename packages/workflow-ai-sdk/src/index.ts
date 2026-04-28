@@ -49,6 +49,7 @@ export type {
   ToolStartEventData,
   WorkflowAbortedEventData,
   WorkflowCheckpoint,
+  WorkflowCustomEvent,
   WorkflowCustomEventData,
   WorkflowDataParts,
   WorkflowDispatchOperation,

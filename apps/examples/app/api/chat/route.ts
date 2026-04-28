@@ -17,6 +17,9 @@ const endEvent = workflowEvent(
   }),
 );
 
+// WorkflowUIMessage accepts optional generics for custom metadata, data parts,
+// and tools: WorkflowUIMessage<MyMetadata, MyDataParts, MyTools>.
+// Without type args it uses the standard workflow types.
 type RequestBody = {
   messages?: WorkflowUIMessage[];
 };

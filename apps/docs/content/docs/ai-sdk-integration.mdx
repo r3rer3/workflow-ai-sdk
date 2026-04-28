@@ -8,7 +8,8 @@ description: Workflow wrappers preserve AI SDK lifecycle callbacks, chunk shapes
   messages, then streams the agent output back as native AI SDK UI chunks.
 - Workflow tools are still AI SDK tools. `createWorkflowTool(...)` adds
   runtime context plus `tool-start` / `tool-end` lifecycle events without
-  inventing a second tool protocol.
+  inventing a second tool protocol, and it keeps tool input/output inference
+  tied to the AI SDK-style `inputSchema` and `execute(...)` contract.
 - `toUIMessageStream(execution)` keeps the response compatible with AI SDK
   clients such as `useChat`. Standard text, reasoning, source, and tool chunks
   stay intact.
@@ -16,6 +17,42 @@ description: Workflow wrappers preserve AI SDK lifecycle callbacks, chunk shapes
   `data-workflow-*`, `data-agent-*`, `data-tool-*`, and `data-custom-event`
   parts. The client decides whether to ignore them, render them inline, or use
   them to drive a separate timeline UI.
+- `WorkflowUIMessage` accepts optional generic parameters for custom metadata,
+  data parts, and tool types. Extend `WorkflowMessageMetadata` or
+  `WorkflowDataParts` to add domain-specific fields while keeping all standard
+  workflow types intact. See [Typesafety](/docs/typesafety) for details.
+
+The most useful pattern is to export one shared message alias and use it on
+both sides of the transport:
+
+```ts
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import type {
+  WorkflowCustomEvent,
+  WorkflowDataParts,
+  WorkflowMessageMetadata,
+  WorkflowUIMessage,
+} from "workflow-ai-sdk";
+
+type ApprovalEvent = WorkflowCustomEvent<
+  "approval-requested",
+  { toolName: string; operation: string }
+>;
+
+export type MyMessage = WorkflowUIMessage<
+  WorkflowMessageMetadata,
+  WorkflowDataParts<ApprovalEvent>
+>;
+
+const chat = useChat<MyMessage>({
+  transport: new DefaultChatTransport({ api: "/api/my-workflow" }),
+});
+```
+
+Then your route/store/workflow code and your page can all reference the same
+type, and `useChat<MyMessage>(...)` will narrow `data-custom-event` parts from
+`part.data.name`.
 
 This is why the examples app can use a normal chat transport for text while
 still surfacing workflow progress in custom UI components.

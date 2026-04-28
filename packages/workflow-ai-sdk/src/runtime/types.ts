@@ -42,7 +42,21 @@ export interface WorkflowMessageMetadata {
   agentName?: string;
 }
 
-export type WorkflowDataParts = {
+export type WorkflowCustomEvent<
+  NAME extends string = string,
+  DATA = unknown,
+> = {
+  name: NAME;
+  data: DATA;
+};
+
+export type WorkflowDataParts<
+  TCustomEvent extends WorkflowCustomEvent = WorkflowCustomEvent<
+    string,
+    JsonValue
+  >,
+  TAdditionalParts extends Record<string, unknown> = Record<string, unknown>,
+> = {
   "workflow-start": WorkflowStartEventData;
   "workflow-step": WorkflowStepEventData;
   "workflow-end": WorkflowEndEventData;
@@ -53,19 +67,19 @@ export type WorkflowDataParts = {
   "agent-end": AgentEndEventData;
   "tool-start": ToolStartEventData;
   "tool-end": ToolEndEventData;
-  "custom-event": WorkflowCustomEventData;
-};
+  "custom-event": WorkflowCustomEventData<TCustomEvent>;
+} & TAdditionalParts;
 
-export type WorkflowUIMessage<TOOLS extends UITools = UITools> = UIMessage<
-  WorkflowMessageMetadata,
-  WorkflowDataParts,
-  TOOLS
->;
+export type WorkflowUIMessage<
+  METADATA extends WorkflowMessageMetadata = WorkflowMessageMetadata,
+  DATA_PARTS extends WorkflowDataParts<any> = WorkflowDataParts,
+  TOOLS extends UITools = UITools,
+> = UIMessage<METADATA, DATA_PARTS, TOOLS>;
 
 // Native workflow execution state keeps user-owned workflow data separate from framework-owned messages.
 export interface WorkflowExecutionState<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   state: TState;
   messages: TMessage[];
@@ -121,11 +135,21 @@ export interface WorkflowAbortedEventData {
   hierarchy: ExecutionHierarchy;
 }
 
-export interface WorkflowCustomEventData {
-  name: string;
-  data: JsonValue;
+export type WorkflowCustomEventData<
+  TEvent extends WorkflowCustomEvent = WorkflowCustomEvent<string, JsonValue>,
+> = TEvent & {
   hierarchy: ExecutionHierarchy;
-}
+};
+
+export type InferWorkflowUIMessageMetadata<TMessage extends WorkflowUIMessage> =
+  TMessage extends WorkflowUIMessage<infer TMetadata, any, any>
+  ? TMetadata
+  : never;
+
+export type InferWorkflowUIMessageData<TMessage extends WorkflowUIMessage> =
+  TMessage extends WorkflowUIMessage<any, infer TDataParts, any>
+  ? TDataParts
+  : never;
 
 export interface AgentUsageEntry {
   model?: string;
@@ -211,7 +235,7 @@ export type WorkflowStepResult =
 
 export interface WorkflowRunRecord<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   workflowName: string;
   runId: string;
@@ -227,7 +251,7 @@ export interface WorkflowRunRecord<
 
 export interface WorkflowCheckpoint<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   workflowName: string;
   runId: string;
@@ -258,7 +282,7 @@ export interface WorkflowRuntimeCheckpoint {
 
 export interface WorkflowStore<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   createRun(record: WorkflowRunRecord<TState, TMessage>): Promise<void>;
   markRunRunning(runId: string): Promise<void>;
@@ -280,7 +304,7 @@ export interface WorkflowStore<
 
 export interface RuntimeContext<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   runId: string;
   threadId: string;
@@ -300,7 +324,7 @@ export interface RuntimeContext<
 export type WorkflowStepHandler<
   TState extends Record<string, unknown>,
   TTrigger extends WorkflowTriggerLike,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
   TEventData = WorkflowStepInput<TTrigger>,
 > = (
   context: RuntimeContext<TState, TMessage>,
@@ -310,7 +334,7 @@ export type WorkflowStepHandler<
 export interface WorkflowStep<
   TState extends Record<string, unknown>,
   TTrigger extends WorkflowTriggerLike,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
   TEventData = WorkflowStepInput<TTrigger>,
 > {
   name: string;
@@ -320,7 +344,7 @@ export interface WorkflowStep<
 
 export interface WorkflowInitialStateFactoryOptions<
   TInput,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   input: TInput;
   threadId: string;
@@ -332,7 +356,7 @@ export interface WorkflowInitialStateFactoryOptions<
 export interface WorkflowRunOptions<
   TInput,
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   input: TInput;
   messages?: TMessage[];
@@ -345,7 +369,7 @@ export interface WorkflowRunOptions<
 
 export interface WorkflowResumeOptions<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   runId: string;
   store: WorkflowStore<TState, TMessage>;
@@ -353,7 +377,7 @@ export interface WorkflowResumeOptions<
   metadata?: JsonObject;
 }
 
-export interface WorkflowExecution<TMessage extends UIMessage> {
+export interface WorkflowExecution<TMessage extends WorkflowUIMessage> {
   workflowName: string;
   runId: string;
   threadId: string;
@@ -367,7 +391,7 @@ export interface WorkflowExecution<TMessage extends UIMessage> {
 export type WorkflowRunOptionsFor<
   TInput,
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > = [TInput] extends [never]
   ? Omit<WorkflowRunOptions<TInput, TState, TMessage>, "input">
   : WorkflowRunOptions<TInput, TState, TMessage>;
@@ -376,7 +400,7 @@ export interface DefinedWorkflow<
   TInput,
   TState extends Record<string, unknown>,
   TResult extends JsonValue,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
   TTrigger extends WorkflowEventDefinition<string, TInput>,
   TFinish extends WorkflowEventDefinition<string, TResult>,
 > {

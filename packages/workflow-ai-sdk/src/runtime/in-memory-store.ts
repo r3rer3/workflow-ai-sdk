@@ -1,5 +1,3 @@
-import type { UIMessage } from "ai";
-
 import { safeStructuredClone } from "./clone";
 import type {
   JsonValue,
@@ -9,11 +7,12 @@ import type {
   WorkflowRunRecord,
   WorkflowStore,
   WorkflowStreamEvent,
+  WorkflowUIMessage,
 } from "./types";
 
 export interface InMemoryWorkflowStoreState<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > {
   runs: Map<string, WorkflowRunRecord<TState, TMessage>>;
   checkpoints: Map<string, WorkflowCheckpoint<TState, TMessage>>;
@@ -23,7 +22,7 @@ export interface InMemoryWorkflowStoreState<
 
 export class InMemoryWorkflowStore<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 > implements WorkflowStore<TState, TMessage> {
   readonly state: InMemoryWorkflowStoreState<TState, TMessage> = {
     runs: new Map(),
@@ -150,7 +149,7 @@ export class InMemoryWorkflowStore<
 
 export function createInMemoryWorkflowStore<
   TState extends Record<string, unknown>,
-  TMessage extends UIMessage,
+  TMessage extends WorkflowUIMessage,
 >(): InMemoryWorkflowStore<TState, TMessage> {
   return new InMemoryWorkflowStore<TState, TMessage>();
 }
