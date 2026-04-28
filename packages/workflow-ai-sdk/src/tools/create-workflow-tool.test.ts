@@ -78,9 +78,9 @@ describe("createWorkflowTool", () => {
     const { context, emitted } = createContext(state);
 
     const factory = createWorkflowTool<
+      { calls: number },
       { a: number; b: number },
-      number,
-      { calls: number }
+      number
     >({
       name: "sum",
       description: "Sums two values",
@@ -88,11 +88,7 @@ describe("createWorkflowTool", () => {
         a: z.number(),
         b: z.number(),
       }),
-      execute: async (
-        input: { a: number; b: number },
-        _options,
-        runtimeContext,
-      ) => {
+      execute: async (input, _options, runtimeContext) => {
         runtimeContext.state.calls += 1;
         return input.a + input.b;
       },
@@ -128,16 +124,12 @@ describe("createWorkflowTool", () => {
     const { context, emitted } = createContext({
       calls: 0,
     });
-    const factory = createWorkflowTool<
-      { a: number },
-      number,
-      { calls: number }
-    >({
+    const factory = createWorkflowTool({
       name: "explode",
       inputSchema: z.object({
         a: z.number(),
       }),
-      execute: async () => {
+      execute: async (): Promise<number> => {
         throw new Error("boom");
       },
     });
@@ -175,9 +167,9 @@ describe("createWorkflowTool", () => {
     const { context, emitted } = createContext(state);
 
     const factory = createWorkflowTool<
+      { calls: number },
       { city: string },
-      { forecast: string },
-      { calls: number }
+      { forecast: string }
     >({
       name: "lookup_weather",
       inputSchema: z.object({
@@ -227,9 +219,9 @@ describe("createWorkflowTool", () => {
       calls: 0,
     });
     const factory = createWorkflowTool<
+      { calls: number },
       { city: string },
-      never,
-      { calls: number }
+      never
     >({
       name: "lookup",
       inputSchema: z.object({

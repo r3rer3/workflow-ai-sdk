@@ -192,9 +192,9 @@ describe("createAgent", () => {
     const { context, events } = createContext(state, messages);
 
     const lookupTool = createWorkflowTool<
+      { toolCalls: number },
       { topic: string },
-      { note: string },
-      { toolCalls: number }
+      { note: string }
     >({
       name: "lookup_fact",
       inputSchema: z.object({

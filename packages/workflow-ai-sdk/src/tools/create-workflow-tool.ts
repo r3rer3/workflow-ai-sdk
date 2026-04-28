@@ -35,14 +35,20 @@ export type WorkflowToolConfig<
   ) => MaybePromise<TOutput>;
 };
 
+export function createWorkflowTool<TInput, TOutput>(
+  config: WorkflowToolConfig<TInput, TOutput>,
+): WorkflowTool<TInput, TOutput>;
 export function createWorkflowTool<
+  TState extends Record<string, unknown>,
   TInput,
   TOutput,
-  TState extends Record<string, unknown> = Record<string, unknown>,
   TMessage extends WorkflowUIMessage = WorkflowUIMessage,
 >(
   config: WorkflowToolConfig<TInput, TOutput, TState, TMessage>,
-): WorkflowTool<TInput, TOutput, TState, TMessage> {
+): WorkflowTool<TInput, TOutput, TState, TMessage>;
+export function createWorkflowTool(
+  config: WorkflowToolConfig<any, any, any, any>,
+): WorkflowTool<any, any, any, any> {
   return (context) => {
     const startedAtByCallId = new Map<string, number>();
     const {
@@ -92,9 +98,7 @@ export function createWorkflowTool<
 
     const baseTool = {
       ...toolConfig,
-      onInputAvailable: async (
-        args: ToolInputAvailableOptions<TInput, TOutput>,
-      ) => {
+      onInputAvailable: async (args: ToolInputAvailableOptions<any, any>) => {
         emitToolStart(args.toolCallId);
         await onInputAvailable?.(args);
       },
@@ -107,7 +111,7 @@ export function createWorkflowTool<
     const wrappedTool = executeWithContext
       ? tool({
         ...baseTool,
-        execute: async (input: TInput, options: ToolExecutionOptions) => {
+        execute: async (input: any, options: ToolExecutionOptions) => {
           emitToolStart(options.toolCallId);
 
           try {
@@ -122,8 +126,8 @@ export function createWorkflowTool<
             throw error;
           }
         },
-      } as Tool<TInput, TOutput>)
-      : tool(baseTool as Tool<TInput, TOutput>);
+      } as Tool<any, any>)
+      : tool(baseTool as Tool<any, any>);
 
     return Object.assign(wrappedTool, {
       name: config.name,

@@ -96,9 +96,9 @@ function createResearchTool(branchId: BranchId) {
   const spec = branchSpecs[branchId];
 
   return createWorkflowTool<
+    MultiAgentState,
     { topic: string },
-    { note: string },
-    MultiAgentState
+    { note: string }
   >({
     name: spec.toolName,
     inputSchema: z.object({
