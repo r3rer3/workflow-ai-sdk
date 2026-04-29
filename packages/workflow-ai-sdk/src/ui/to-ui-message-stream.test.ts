@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import type { WorkflowExecution, WorkflowUIMessage } from "../index";
+import type {
+  WorkflowCustomEvent,
+  WorkflowDataParts,
+  WorkflowExecution,
+  WorkflowMessageMetadata,
+  WorkflowUIMessage,
+} from "../index";
 import { toUIMessageStream } from "../index";
 
 async function collect<T>(stream: ReadableStream<T>): Promise<T[]> {
@@ -19,7 +25,13 @@ async function collect<T>(stream: ReadableStream<T>): Promise<T[]> {
 
 describe("toUIMessageStream", () => {
   it("maps workflow events into AI SDK data chunks", async () => {
-    const execution: WorkflowExecution<WorkflowUIMessage> = {
+    type ProgressEvent = WorkflowCustomEvent<"progress", { value: number }>;
+    type TestMessage = WorkflowUIMessage<
+      WorkflowMessageMetadata,
+      WorkflowDataParts<ProgressEvent>
+    >;
+
+    const execution: WorkflowExecution<TestMessage> = {
       workflowName: "demo",
       runId: "run_1",
       threadId: "thread_1",
@@ -85,6 +97,16 @@ describe("toUIMessageStream", () => {
       "data-custom-event",
       "text-start",
     ]);
+
+    const customEventChunk = chunks[2];
+    expect(customEventChunk).toBeDefined();
+    if (!customEventChunk || customEventChunk.type !== "data-custom-event") {
+      throw new Error("Expected data-custom-event chunk.");
+    }
+
+    const progressValue = customEventChunk.data.data.value;
+    expect(progressValue).toBe(1);
+    expect(customEventChunk.data.name).toBe("progress");
   });
 
   it("filters ui chunks and accepts promised executions", async () => {

@@ -149,12 +149,9 @@ type ApprovalRequestedEvent = WorkflowCustomEvent<
 
 type MyCustomEvent = ResearchStartedEvent | ApprovalRequestedEvent;
 
-type MyDataParts = WorkflowDataParts<
-  MyCustomEvent,
-  {
-    "progress-update": { percent: number; stage: string };
-  }
->;
+type MyDataParts = WorkflowDataParts<MyCustomEvent, {
+  "progress-update": { percent: number; stage: string };
+}>;
 
 type MyMessage = WorkflowUIMessage<WorkflowMessageMetadata, MyDataParts>;
 ```

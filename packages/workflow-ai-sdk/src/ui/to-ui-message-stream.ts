@@ -89,6 +89,17 @@ export class WorkflowUIStream<
       ...init,
     });
   }
+
+  [Symbol.asyncIterator]() {
+    const reader = this.stream.getReader();
+
+    return {
+      next: async () => {
+        const { done, value } = await reader.read();
+        return { done, value };
+      },
+    };
+  }
 }
 
 export async function toUIMessageStream<

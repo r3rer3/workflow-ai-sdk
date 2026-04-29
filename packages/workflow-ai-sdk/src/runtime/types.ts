@@ -55,7 +55,8 @@ export type WorkflowDataParts<
     string,
     JsonValue
   >,
-  TAdditionalParts extends Record<string, unknown> = Record<string, unknown>,
+  // biome-ignore lint/complexity/noBannedTypes: necessary for flexibility
+  TExtensions extends Record<string, unknown> = {},
 > = {
   "workflow-start": WorkflowStartEventData;
   "workflow-step": WorkflowStepEventData;
@@ -68,11 +69,11 @@ export type WorkflowDataParts<
   "tool-start": ToolStartEventData;
   "tool-end": ToolEndEventData;
   "custom-event": WorkflowCustomEventData<TCustomEvent>;
-} & TAdditionalParts;
+} & TExtensions;
 
 export type WorkflowUIMessage<
   METADATA extends WorkflowMessageMetadata = WorkflowMessageMetadata,
-  DATA_PARTS extends WorkflowDataParts<any> = WorkflowDataParts,
+  DATA_PARTS extends Record<string, unknown> = Record<string, unknown>,
   TOOLS extends UITools = UITools,
 > = UIMessage<METADATA, DATA_PARTS, TOOLS>;
 
@@ -187,12 +188,14 @@ export interface ToolEndEventData {
   hierarchy: ExecutionHierarchy;
 }
 
-export type WorkflowStreamEventFromParts = {
-  [K in keyof WorkflowDataParts]: { type: K; data: WorkflowDataParts[K] };
-}[keyof WorkflowDataParts];
+export type WorkflowStreamEventFromParts<
+  TDataParts extends Record<string, unknown> = WorkflowDataParts,
+> = {
+  [K in keyof TDataParts & string]: { type: K; data: TDataParts[K] };
+}[keyof TDataParts & string];
 
-export type WorkflowStreamEvent<TMessage extends UIMessage> =
-  | WorkflowStreamEventFromParts
+export type WorkflowStreamEvent<TMessage extends WorkflowUIMessage> =
+  | WorkflowStreamEventFromParts<WorkflowDataParts>
   | {
     type: "ui-message-chunk";
     data: {

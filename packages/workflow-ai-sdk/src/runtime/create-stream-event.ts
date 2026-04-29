@@ -1,7 +1,7 @@
 import type {
   AgentUsageEntry,
   ExecutionHierarchy,
-  WorkflowCustomEventData,
+  WorkflowCustomEvent,
   WorkflowDataParts,
   WorkflowEndEventData,
   WorkflowExecutionMode,
@@ -9,10 +9,10 @@ import type {
   WorkflowStreamEventFromParts,
 } from "./types";
 
-type StreamEvent<T extends keyof WorkflowDataParts> = Extract<
-  WorkflowStreamEventFromParts,
-  { type: T }
->;
+type StreamEvent<
+  TDataParts extends Record<string, unknown>,
+  TName extends keyof TDataParts,
+> = Extract<WorkflowStreamEventFromParts<TDataParts>, { type: TName }>;
 
 export function createWorkflowHierarchy(
   workflowName: string,
@@ -56,7 +56,7 @@ export function createWorkflowStartStreamEvent(args: {
   mode: WorkflowExecutionMode;
   resumed: boolean;
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"workflow-start"> {
+}): StreamEvent<WorkflowDataParts, "workflow-start"> {
   return {
     type: "workflow-start",
     data: args,
@@ -70,7 +70,7 @@ export function createWorkflowStepStreamEvent(args: {
   eventType: string;
   inputEventTypes: string[];
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"workflow-step"> {
+}): StreamEvent<WorkflowDataParts, "workflow-step"> {
   return {
     type: "workflow-step",
     data: args,
@@ -83,7 +83,7 @@ export function createWorkflowEndStreamEvent(args: {
   durationMs: number;
   result?: WorkflowEndEventData["result"];
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"workflow-end"> {
+}): StreamEvent<WorkflowDataParts, "workflow-end"> {
   return {
     type: "workflow-end",
     data: args,
@@ -96,7 +96,7 @@ export function createWorkflowErrorStreamEvent(args: {
   message: string;
   retryable?: boolean;
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"workflow-error"> {
+}): StreamEvent<WorkflowDataParts, "workflow-error"> {
   return {
     type: "workflow-error",
     data: {
@@ -112,7 +112,7 @@ export function createWorkflowPausedStreamEvent(args: {
   reason: string;
   payload?: WorkflowPausedEventData["payload"];
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"workflow-paused"> {
+}): StreamEvent<WorkflowDataParts, "workflow-paused"> {
   return {
     type: "workflow-paused",
     data: args,
@@ -124,18 +124,21 @@ export function createWorkflowAbortedStreamEvent(args: {
   runId: string;
   reason?: string;
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"workflow-aborted"> {
+}): StreamEvent<WorkflowDataParts, "workflow-aborted"> {
   return {
     type: "workflow-aborted",
     data: args,
   };
 }
 
-export function createCustomStreamEvent(args: {
-  name: string;
-  data: WorkflowCustomEventData["data"];
+export function createCustomStreamEvent<TName extends string, TData>(args: {
+  name: TName;
+  data: TData;
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"custom-event"> {
+}): StreamEvent<
+  WorkflowDataParts<WorkflowCustomEvent<TName, TData>>,
+  "custom-event"
+> {
   return {
     type: "custom-event",
     data: args,
@@ -146,7 +149,7 @@ export function createAgentStartStreamEvent(args: {
   agentName: string;
   agentRunId: string;
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"agent-start"> {
+}): StreamEvent<WorkflowDataParts, "agent-start"> {
   return {
     type: "agent-start",
     data: args,
@@ -160,7 +163,7 @@ export function createAgentEndStreamEvent(args: {
   durationMs: number;
   hierarchy: ExecutionHierarchy;
   usage?: AgentUsageEntry;
-}): StreamEvent<"agent-end"> {
+}): StreamEvent<WorkflowDataParts, "agent-end"> {
   return {
     type: "agent-end",
     data: args,
@@ -171,7 +174,7 @@ export function createToolStartStreamEvent(args: {
   toolName: string;
   toolCallId: string;
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"tool-start"> {
+}): StreamEvent<WorkflowDataParts, "tool-start"> {
   return {
     type: "tool-start",
     data: args,
@@ -184,7 +187,7 @@ export function createToolEndStreamEvent(args: {
   success: boolean;
   durationMs: number;
   hierarchy: ExecutionHierarchy;
-}): StreamEvent<"tool-end"> {
+}): StreamEvent<WorkflowDataParts, "tool-end"> {
   return {
     type: "tool-end",
     data: args,

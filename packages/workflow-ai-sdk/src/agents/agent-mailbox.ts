@@ -80,7 +80,7 @@ export function createAgentMailbox<
           name: eventName,
           data: {
             message: cloneMessage(message),
-          } as JsonValue,
+          },
           hierarchy: context.getHierarchy(),
         }),
       );

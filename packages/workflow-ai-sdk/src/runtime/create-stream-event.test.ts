@@ -1,4 +1,8 @@
 import { describe, expect, it } from "bun:test";
+import type {
+  WorkflowCustomEvent,
+  WorkflowCustomEventData,
+} from "../index";
 
 import {
   createAgentEndStreamEvent,
@@ -252,6 +256,30 @@ describe("createCustomStreamEvent", () => {
     expect(event.data.name).toBe("my-custom");
     expect(event.data.data).toEqual({ key: "value" });
     expect(event.data.hierarchy).toEqual(hierarchy);
+  });
+
+  it("preserves the custom event name and payload types", () => {
+    type ProgressEvent = WorkflowCustomEvent<
+      "progress",
+      { percent: number; label: string }
+    >;
+
+    const event = createCustomStreamEvent({
+      name: "progress",
+      data: {
+        percent: 40,
+        label: "warming-up",
+      },
+      hierarchy,
+    });
+
+    const typedEvent: {
+      type: "custom-event";
+      data: WorkflowCustomEventData<ProgressEvent>;
+    } = event;
+
+    expect(typedEvent.data.data.percent).toBe(40);
+    expect(typedEvent.data.data.label).toBe("warming-up");
   });
 });
 

@@ -20,6 +20,7 @@ import {
 import type {
   AgentUsageEntry,
   RuntimeContext,
+  WorkflowMessageMetadata,
   WorkflowStreamEvent,
   WorkflowUIMessage,
 } from "../runtime/types";
@@ -114,10 +115,10 @@ function instantiateWorkflowTools<
   const entries =
     tools?.map((factory) => {
       const instance = factory(context);
-      return [instance.name, instance] as const;
+      return [instance.name, instance];
     }) ?? [];
 
-  return Object.fromEntries(entries) as ToolSetFromWorkflowTools<TOOLS>;
+  return Object.fromEntries(entries);
 }
 
 export interface WorkflowWrappedAgentResult<TOOLS extends ToolSet = ToolSet> {
@@ -219,7 +220,11 @@ export function createAgent<
       );
 
       const validatedMessages = await validateUIMessages<
-        WorkflowUIMessage<InferUITools<TOOL_SET>>
+        WorkflowUIMessage<
+          WorkflowMessageMetadata,
+          Record<string, unknown>,
+          InferUITools<TOOL_SET>
+        >
       >({
         messages,
         tools: agent.tools,
@@ -237,9 +242,7 @@ export function createAgent<
       let usage: AgentUsageEntry | undefined;
 
       try {
-        for await (const chunk of streamResult.toUIMessageStream<
-          WorkflowUIMessage<InferUITools<TOOL_SET>>
-        >({
+        for await (const chunk of streamResult.toUIMessageStream({
           originalMessages: validatedMessages,
           sendStart: false,
           sendFinish: false,
