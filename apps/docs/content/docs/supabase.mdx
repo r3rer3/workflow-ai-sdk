@@ -1,0 +1,26 @@
+---
+title: Supabase
+description: A WorkflowStore interface pattern for Supabase, RLS, and app-owned tables.
+---
+
+workflow-ai-sdk does not ship a first-party Supabase package. The core
+exposes a small `WorkflowStore` interface, so teams implement persistence
+against their own app-owned tables with RLS enforced by Postgres.
+
+The repository includes a complete reference implementation under
+`apps/examples`:
+
+- `supabase/schema.sql` — three RLS-enabled tables:
+  `workflow_runs`, `workflow_checkpoints`, and `workflow_events`
+- `lib/supabase-server.ts` — cookie-backed `@supabase/ssr` server client
+- `lib/supabase-workflow-store.ts` — `WorkflowStore` implementation that
+  stamps `user_id` on every insert
+- `app/api/db/route.ts` — authenticated resumable route
+
+Important integration details:
+
+- verify the caller with `supabase.auth.getUser()`, not `getSession()`
+- pass `resourceId: user.id` into `workflow.run(...)`
+- persist the checkpoint `runtime` blob intact
+- translate `loadCheckpoint() === null` into HTTP 404 so another user's run id
+  stays indistinguishable from a missing run
