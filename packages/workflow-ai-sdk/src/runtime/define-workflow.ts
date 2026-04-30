@@ -549,17 +549,15 @@ export function defineWorkflow<
   TResult extends JsonValue,
   TMessage extends WorkflowUIMessage,
   TFinishType extends string,
->(
-  options: {
-    name: string;
-    description?: string;
-    trigger: WorkflowEventDefinition<TTriggerType, TInput>;
-    finish: WorkflowEventDefinition<TFinishType, TResult>;
-    initialState: (
-      args: WorkflowInitialStateFactoryOptions<TInput, TMessage>,
-    ) => Promise<TState> | TState;
-  },
-): DefinedWorkflow<
+>(options: {
+  name: string;
+  description?: string;
+  trigger: WorkflowEventDefinition<TTriggerType, TInput>;
+  finish: WorkflowEventDefinition<TFinishType, TResult>;
+  initialState: (
+    args: WorkflowInitialStateFactoryOptions<TInput, TMessage>,
+  ) => Promise<TState> | TState;
+}): DefinedWorkflow<
   TInput,
   TState,
   TResult,
@@ -1188,22 +1186,6 @@ export function defineWorkflow<
 
         void (async () => {
           try {
-            if (args.resumed) {
-              await args.store?.markRunRunning(args.runId);
-            }
-
-            await emitEvent(
-              createWorkflowStartStreamEvent({
-                workflowName: options.name,
-                runId: args.runId,
-                threadId: args.threadId,
-                resourceId: args.resourceId,
-                mode: args.mode,
-                resumed: args.resumed,
-                hierarchy,
-              }),
-            );
-
             if (!args.resumed) {
               const [triggerEvent, ...restPendingEvents] = args.pendingEvents;
 
@@ -1241,7 +1223,33 @@ export function defineWorkflow<
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
               });
+
+              await emitEvent(
+                createWorkflowStartStreamEvent({
+                  workflowName: options.name,
+                  runId: args.runId,
+                  threadId: args.threadId,
+                  resourceId: args.resourceId,
+                  mode: args.mode,
+                  resumed: args.resumed,
+                  hierarchy,
+                }),
+              );
             } else {
+              await emitEvent(
+                createWorkflowStartStreamEvent({
+                  workflowName: options.name,
+                  runId: args.runId,
+                  threadId: args.threadId,
+                  resourceId: args.resourceId,
+                  mode: args.mode,
+                  resumed: args.resumed,
+                  hierarchy,
+                }),
+              );
+
+              await args.store?.markRunRunning(args.runId);
+
               await validateStepHistories();
             }
 
