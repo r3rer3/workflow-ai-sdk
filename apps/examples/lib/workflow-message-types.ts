@@ -14,3 +14,13 @@ export type ResumeWorkflowMessage = WorkflowUIMessage<
   WorkflowMessageMetadata,
   WorkflowDataParts<ResumeCustomEvent>
 >;
+
+export type DbCustomEvent = WorkflowCustomEvent<
+  "persisting",
+  { topic: string; steps: number }
+>;
+
+export type DbWorkflowMessage = WorkflowUIMessage<
+  WorkflowMessageMetadata,
+  WorkflowDataParts<DbCustomEvent>
+>;
