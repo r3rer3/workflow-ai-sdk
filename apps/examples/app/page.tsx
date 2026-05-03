@@ -36,33 +36,6 @@ const sections: Section[] = [
     ],
   },
   {
-    id: "tools",
-    label: "Tools",
-    items: [
-      {
-        index: "03",
-        title: "Tool response",
-        path: "/tool-response",
-        description:
-          "Workflow step calls a lookup_weather tool and summarizes the structured result.",
-      },
-      {
-        index: "04",
-        title: "Tool approval (AI SDK style)",
-        path: "/tool-approval-ai-sdk",
-        description:
-          "Tool declared with needsApproval: true. The workflow pauses on the approval request and resumes after the client echoes a decision.",
-      },
-      {
-        index: "05",
-        title: "Tool approval (workflow style)",
-        path: "/tool-approval-workflow",
-        description:
-          "Workflow step — not the tool — owns the approval policy. Pauses before calling delete_record.",
-      },
-    ],
-  },
-  {
     id: "orchestration",
     label: "Orchestration",
     items: [
